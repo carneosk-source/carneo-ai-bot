@@ -57,14 +57,17 @@
       bubble.style.background = '#111';
       bubble.style.color = '#fff';
       bubble.style.borderBottomRightRadius = '4px';
+      // zákazník – čistý text (bez HTML)
+      bubble.innerText = text;
     } else {
       bubble.style.background = '#fff';
       bubble.style.color = '#222';
       bubble.style.borderBottomLeftRadius = '4px';
       bubble.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+      // AI – HTML (link, <b>, atď.)
+      bubble.innerHTML = text;
     }
 
-    bubble.innerText = text;
     wrap.appendChild(bubble);
     log.appendChild(wrap);
     log.scrollTop = log.scrollHeight;
