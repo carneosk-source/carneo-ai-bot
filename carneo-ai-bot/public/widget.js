@@ -42,7 +42,7 @@
     addMsg(q, 'you');
     input.value = '';
     try {
-      const r = await fetch(API_BASE + '/api/ask', {
+      const r = await fetch('https://carneo-ai-bot.onrender.com/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q })
