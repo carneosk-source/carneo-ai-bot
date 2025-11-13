@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { OpenAI } from 'openai';
-import { search } from './rag.js';
+import { search } from '../rag.js';
 
 const app = express();
 app.use(cors());
@@ -22,7 +22,6 @@ app.post('/api/ask', async (req, res) => {
     const { question, mode } = req.body as {
       question?: string;
       mode?: 'product' | 'order' | 'tech' | null;
-      contextHint?: string;
     };
 
     if (!question || typeof question !== 'string') {
@@ -35,52 +34,54 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
 
     let systemExtra = '';
     let searchHint = '';
+    let domain: 'general' | 'products' = 'general';
 
     switch (mode) {
       case 'product':
-  systemExtra = `
-Prioritne rieš výber produktov značky Carneo (hodinky, náramky, prstene, príslušenstvo).
-NEodporúčaj iné značky (Garmin, Apple, Suunto…).
-
-Keď zákazník položí otázku o výbere produktu:
-- NEpýtaj sa, či máš "prehľadať ponuku" – urob to automaticky.
-- Automaticky využívaj znalostnú databázu (RAG) a odporuč 1 až 3 najvhodnejšie produkty Carneo podľa parametrov otázky.
-- Vždy uveď presné názvy produktov Carneo tak, ako sú na e-shope.
-- Ak máš v kontexte URL produktu (meta.url), vlož ju do odpovede.
-- Ak URL nemáš, nevymýšľaj link – napíš: „Produkt nájdete na www.carneo.sk po zadaní názvu do vyhľadávania“.
-- Nikdy zákazníka nežiadaj o povolenie „mám to prehľadať?“; odpovedaj rovno.`;
-
-  searchHint = 'Produkty Carneo, výber podľa parametrov, produkty z e-shopu www.carneo.sk.';
-  break;
+        systemExtra = `
+Prioritne ries vyber produktov znacky Carneo (hodinky, naramky, prstene, prislusenstvo).
+NEodporucaj ine znacky (Garmin, Apple, Suunto, Samsung a pod.), iba Carneo.
+Keď zakaznik pyta vyber produktu:
+- automaticky pouzi produktovy index (RAG) a odporuc 1 az 3 najvhodnejsie produkty.
+- vzdy uveď presný nazov produktu Carneo tak, ako je v e-shope.
+- ak mas v meta.url URL produktu, uveď ju v odpovedi.
+- ak URL nemas, nevymyslaj link – napis, ze produkt najde podla nazvu na www.carneo.sk.`;
+        searchHint = 'Vyber produktu znacky Carneo, pouzi produktovy index.';
+        domain = 'products';
+        break;
 
       case 'order':
         systemExtra = `
 Zameraj sa na otazky o objednavkach, doprave, platbe, dodacej lehote, reklamacii a vrateni tovaru.
-Ak chyba informacia o konkretnom cisle objednavky alebo osobnych udajoch, vysvetli, co presne by mal zakaznik poslat podpore (napr. cislo objednavky, e-mail).`;
+Ak chyba informacia o konkretnom cisle objednavky alebo osobnych udajoch, vysvetli, co presne by mal zakaznik poslat podpore (cislo objednavky, e-mail).`;
         searchHint = 'Tema: objednavky, dorucenie, reklamacie, vratky.';
+        domain = 'general';
         break;
 
       case 'tech':
         systemExtra = `
 Zameraj sa na technicke dotazy k produktom Carneo – parovanie hodiniek, aplikacia, kompatibilita s telefonom, baterka, aktualizacie a podobne.
-Ak problem vyzera vazne alebo neda sa jednoducho vyriesit, navrhni kontakt na technicku podporu (Carneo servis).`;
+Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na technicku podporu (Carneo servis).`;
         searchHint = 'Tema: technicke dotazy a navody k produktom Carneo.';
+        domain = 'general';
         break;
 
       default:
         searchHint = '';
+        domain = 'general';
     }
 
     const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
 
-    // RAG vyhľadávanie – doplníme hint podľa režimu
     const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-    const hits = await search(openai, queryForSearch, 6);
+
+    // tu je klúčové: product režim používa produktový index
+    const hits = await search(openai, queryForSearch, 6, { domain });
 
     const citations = hits
       .map((h, i) => {
         const urlPart = h.meta?.url ? ` URL: ${h.meta.url}` : '';
-        return `[[${i + 1}]] ${h.meta?.file || 'doc'}: ${h.text.slice(0, 180)}...${urlPart}`;
+        return `[[${i + 1}]] ${h.meta?.name || h.meta?.file || 'doc'}: ${h.text.slice(0, 180)}...${urlPart}`;
       })
       .join('\n');
 
@@ -93,7 +94,7 @@ ${citations}
 Pokyny:
 - Pouzi informacie z pasazi vyssie.
 - Odpovedaj vecne, v kratkych odstavcoch.
-- Pri rezime "vyber produktu" uprednostnuj produkty Carneo, ine znacky nespominaj.
+- Pri rezime "vyber produktu" uprednostnuj produkty Carneo a pouzi meta.url ako odkaz, ak je k dispozicii.
 - Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj.`;
 
     const response = await openai.responses.create({
@@ -112,7 +113,7 @@ Pokyny:
     res.json({
       answer,
       sources: hits.map((h) => ({
-        file: h.meta?.file,
+        file: h.meta?.file || h.meta?.name,
         id: h.id,
         url: (h.meta as any)?.url
       }))
