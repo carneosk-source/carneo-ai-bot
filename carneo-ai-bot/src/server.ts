@@ -9,6 +9,8 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use('/public', express.static('public'));
 
+app.get('/', (req, res) => res.send('OK'));
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 
