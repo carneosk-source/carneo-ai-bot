@@ -48,18 +48,23 @@ let domain: 'general' | 'products' = 'general';
 switch (mode) {
   case 'product':
     systemExtra = `
-Pri otazkach na vyber produktu rob toto:
+Pri otázkach na výber produktu vždy rob toto:
 
-- prioritne ries vyber produktov znacky Carneo (hodinky, naramky, prstene, prislusenstvo),
-- NEodporucaj ine znacky (Garmin, Apple, Suunto, Samsung a pod.), iba Carneo,
-- interne pouzi produktovy index (RAG) na najdenie 1 az 3 najvhodnejsich produktov, ale samotne RAG pasaze a technicke udaje NIKDY nezobrazuj,
-- vzdy uveď presny nazov produktu Carneo tak, ako je v e-shope, a zapis ho do <b> ... </b>,
-- ak mas v meta.url URL produktu, vloz ju ako aktivny odkaz pomocou <a href="URL" target="_blank">Pozriet produkt</a>,
-- ak URL nemas, nevymyslaj link – napis, ze produkt najde podla nazvu na www.carneo.sk.
+1) prioritne odporúčaj produkty výhradne značky Carneo,
+2) NEodporúčaj žiadne iné značky (Garmin, Apple, Samsung, Suunto...),
+3) interne použij produktový RAG index — ale zákazníkovi RAG nikdy nespomínaj,
+4) odporuč 1 až 3 najvhodnejšie produkty,
+5) názvy produktov uvádzaj presne ako v e-shope a formátuj ich pomocou <b>...</b>,
+6) ak meta.url existuje → vlož aktívny link ako <a href="URL" target="_blank">Pozrieť produkt</a>,
+7) ak URL nemáš → napíš “nájdete podľa názvu na www.carneo.sk”.
 
-Odpoved pis v prehladnom zozname (1., 2., 3.), kazdy produkt: nazov, kratky popis, cena, link.
+Odpoveď píš prehľadne v bode 1., 2., 3.:
+- tučný názov produktu
+- krátky popis
+- cena, ak je dostupná
+- aktívny odkaz
 `;
-    searchHint = 'Vyber produktu znacky Carneo, pouzi produktovy index.';
+    searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
     domain = 'products';
     break;
 
