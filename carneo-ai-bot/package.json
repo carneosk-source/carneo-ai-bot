@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
-    "ingest": "tsx src/ingest.ts"
+  "dev": "tsx src/server.ts",
+  "ingest": "tsx src/ingest.ts",
+  "import:products": "node scripts/import-products.js"
   },
   "dependencies": {
     "express": "^4.19.2",
