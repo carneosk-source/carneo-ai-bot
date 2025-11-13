@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-  "dev": "tsx src/server.ts",
-  "ingest": "tsx src/ingest.ts",
-  "import:products": "node scripts/import-products.js"
+    "dev": "tsx src/server.ts",
+    "ingest": "tsx src/ingest.ts",
+    "import:products": "node scripts/import-products.js"
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -14,7 +14,7 @@
     "pdf-parse": "^1.1.1",
     "textract": "2.5.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
     "fast-xml-parser": "^4.5.0"
   },
   "devDependencies": {
