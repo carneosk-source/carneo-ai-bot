@@ -101,15 +101,24 @@ function parseProducts(xmlString) {
   return products;
 }
 
+// ─────────────────────────────────────────────────────────────
+// EMBEDDING – s orezom textu aby neprekročil limity modelu!
+// ─────────────────────────────────────────────────────────────
+
 async function embedDocuments(docs) {
   console.log(`➡ Vytváram embeddingy pre ${docs.length} produktov...`);
 
   const BATCH_SIZE = 64;
   const out = [];
+  const MAX_CHARS = 4000; // bezpečný limit (cca 1500 tokenov)
 
   for (let i = 0; i < docs.length; i += BATCH_SIZE) {
     const batch = docs.slice(i, i + BATCH_SIZE);
-    const inputTexts = batch.map((d) => d.text);
+
+    const inputTexts = batch.map((d) => {
+      const txt = d.text || '';
+      return txt.length > MAX_CHARS ? txt.slice(0, MAX_CHARS) : txt;
+    });
 
     console.log(`  · Batch ${i}–${i + batch.length - 1}`);
 
@@ -124,7 +133,7 @@ async function embedDocuments(docs) {
       out.push({
         id: doc.id,
         embedding: vectors[idx],
-        text: doc.text,
+        text: doc.text, // originál (neorezaný) text
         meta: doc.meta
       });
     });
