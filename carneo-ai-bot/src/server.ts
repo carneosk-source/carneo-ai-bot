@@ -28,6 +28,9 @@ app.post('/api/ask', async (req, res) => {
       return res.status(400).json({ error: 'Missing question' });
     }
 
+    // =========================
+    // SYSTEM PROMPT (BASE + MODES)
+    // =========================
     const baseSystem = `
 Si odborny Carneo AI poradca pre chytre hodinky, naramky a prstene.
 Odpovedaj strucne a vecne, v slovencine alebo cestine podla jazyka dotazu.
@@ -41,35 +44,32 @@ Pouzivaj HTML formatovanie v odpovediach:
 Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo podpora).
 `;
 
-let systemExtra = '';
-let searchHint = '';
-let domain: 'general' | 'products' = 'general';
+    let systemExtra = '';
+    let searchHint = '';
+    let domain: 'general' | 'products' = 'general';
 
-switch (mode) {
-  case 'product':
-    systemExtra = `
-Pri otázkach na výber produktu vždy rob toto:
+    switch (mode) {
+      case 'product':
+        systemExtra = `
+Pri otazkach na vyber produktu vzdy rob toto:
 
-1) prioritne odporúčaj produkty výhradne značky Carneo,
-2) NEodporúčaj žiadne iné značky (Garmin, Apple, Samsung, Suunto...),
-3) interne použij produktový RAG index — ale zákazníkovi RAG nikdy nespomínaj,
-4) odporuč 1 až 3 najvhodnejšie produkty,
-5) názvy produktov uvádzaj presne ako v e-shope a formátuj ich pomocou <b>...</b>,
-6) ak meta.url existuje → vlož aktívny link ako <a href="URL" target="_blank">Pozrieť produkt</a>,
-7) ak URL nemáš → napíš “nájdete podľa názvu na www.carneo.sk”.
+1) prioritne odporucaj produkty vyhradne znacky Carneo,
+2) NEodporucaj ziadne ine znacky (Garmin, Apple, Samsung, Suunto...),
+3) interne pouzi produktovy RAG index – ale zakaznikovi RAG nikdy nespominaj,
+4) odporuc 1 az 3 najvhodnejsie produkty,
+5) nazvy produktov uvadzaj presne ako v e-shope a formatuj ich pomocou <b>...</b>,
+6) ak meta.url existuje → vloz aktivny link ako <a href="URL" target="_blank">Pozriet produkt</a>,
+7) ak URL nemas → napis "najdete podla nazvu na www.carneo.sk".
 
-Odpoveď píš prehľadne v bode 1., 2., 3.:
-- tučný názov produktu
-- krátky popis
-- cena, ak je dostupná
-- aktívny odkaz
+Odpoved pis prehladne v bodoch 1., 2., 3.:
+- tucny nazov produktu
+- kratky popis
+- cena, ak je dostupna
+- aktivny odkaz.
 `;
-    searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
-    domain = 'products';
-    break;
-
-  // ... ostatne case 'order', 'tech' atd. nechaj tak ako mas
-}
+        searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
+        domain = 'products';
+        break;
 
       case 'order':
         systemExtra = `
@@ -90,13 +90,17 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
       default:
         searchHint = '';
         domain = 'general';
+        break;
     }
 
     const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
 
+    // =========================
+    // RAG vyhladavanie
+    // =========================
     const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
 
-    // tu je klúčové: product režim používa produktový index
+    // product rezim pouziva produktovy index, ostatne general
     const hits = await search(openai, queryForSearch, 6, { domain });
 
     const citations = hits
@@ -109,14 +113,16 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
     const prompt = `Otazka zakaznika:
 ${question}
 
-Kontekst (relevantne pasaze zo znalostnej baze Carneo):
+INTERNY KONTEXT – TOTO NEZOBRAZUJ zakaznikovi, len z neho cerpaj informacie:
 ${citations}
 
 Pokyny:
-- Pouzi informacie z pasazi vyssie.
-- Odpovedaj vecne, v kratkych odstavcoch.
+- Pouzi informacie z pasazi vyssie, ale necituj ich doslova.
+- NEpouzivaj slova ako "RAG", "embedding", "skore", "zdroj" a podobne.
 - Pri rezime "vyber produktu" uprednostnuj produkty Carneo a pouzi meta.url ako odkaz, ak je k dispozicii.
-- Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj.`;
+- Odpovedaj vecne, v kratkych odstavcoch alebo bodoch.
+- Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj.
+`;
 
     const response = await openai.responses.create({
       model: MODEL,
