@@ -38,14 +38,20 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
 
     switch (mode) {
       case 'product':
-        systemExtra = `
-Prioritne ries vyber produktov znacky Carneo (hodinky, naramky, prstene, prislusenstvo).
-NEodporucaj ine znacky (Garmin, Apple, Suunto, Samsung atd.), iba Carneo.
-Ak odporucas konkretny produkt, vzdy uved presny nazov produktu tak, ako je v e-shope Carneo.
-Ak mas v kontexte URL produktu (napr. z e-shopu www.carneo.sk), pouzi ju v odpovedi (napr. "Viac info: https://www.carneo.sk/...").
-Ak URL nemas, nevymyslaj link – povedz, ze link doplni agent alebo ze zakaznik najde produkt podla nazvu vo vyhladavani na www.carneo.sk.`;
-        searchHint = 'Tema: vyber produktu znacky Carneo, produkty z e-shopu www.carneo.sk.';
-        break;
+  systemExtra = `
+Prioritne rieš výber produktov značky Carneo (hodinky, náramky, prstene, príslušenstvo).
+NEodporúčaj iné značky (Garmin, Apple, Suunto…).
+
+Keď zákazník položí otázku o výbere produktu:
+- NEpýtaj sa, či máš "prehľadať ponuku" – urob to automaticky.
+- Automaticky využívaj znalostnú databázu (RAG) a odporuč 1 až 3 najvhodnejšie produkty Carneo podľa parametrov otázky.
+- Vždy uveď presné názvy produktov Carneo tak, ako sú na e-shope.
+- Ak máš v kontexte URL produktu (meta.url), vlož ju do odpovede.
+- Ak URL nemáš, nevymýšľaj link – napíš: „Produkt nájdete na www.carneo.sk po zadaní názvu do vyhľadávania“.
+- Nikdy zákazníka nežiadaj o povolenie „mám to prehľadať?“; odpovedaj rovno.`;
+
+  searchHint = 'Produkty Carneo, výber podľa parametrov, produkty z e-shopu www.carneo.sk.';
+  break;
 
       case 'order':
         systemExtra = `
