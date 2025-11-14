@@ -191,8 +191,13 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
 
     const citations = hits
       .map((h, i) => {
-        const urlPart = h.meta?.url ? ` URL: ${h.meta.url}` : '';
-        return `[[${i + 1}]] ${h.meta?.name || h.meta?.file || 'doc'}: ${h.text.slice(0, 180)}...${urlPart}`;
+        const meta: any = h.meta || {};
+        const urlPart = meta.url ? ` URL: ${meta.url}` : '';
+        const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
+        return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
+          0,
+          180
+        )}...${urlPart}${imagePart}`;
       })
       .join('\n');
 
