@@ -18,7 +18,7 @@ const openai = new OpenAI({
 // pomocné funkcie
 // ─────────────────────────────────────────────────────────────
 
-async function fetchXml(url) {
+async function fetchXml(url: string) {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch XML feed: ${res.status} ${res.statusText}`);
@@ -26,7 +26,7 @@ async function fetchXml(url) {
   return await res.text();
 }
 
-function parseProducts(xmlString) {
+function parseProducts(xmlString: string) {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
@@ -45,7 +45,7 @@ function parseProducts(xmlString) {
 
   const arr = Array.isArray(items) ? items : [items];
 
-  const products = arr.map((item) => {
+  const products = arr.map((item: any) => {
     const id =
       item.ITEM_ID ||
       item.ID ||
@@ -61,12 +61,18 @@ function parseProducts(xmlString) {
     const description = item.DESCRIPTION || '';
     const params = item.PARAM || [];
 
-    // obrázok produktu
-    const image =
-      item.IMGURL ||
-      item.IMGURL_ALTERNATIVE ||
-      (Array.isArray(item.IMGURL_ALTERNATIVE) ? item.IMGURL_ALTERNATIVE[0] : '') ||
-      '';
+    // obrázok produktu – vždy chceme JEDNU URL (string)
+    let image = '';
+
+    if (Array.isArray(item.IMGURL_ALTERNATIVE) && item.IMGURL_ALTERNATIVE.length > 0) {
+      // ak je viac alternatív, vezmeme prvú
+      image = item.IMGURL_ALTERNATIVE[0];
+    } else if (typeof item.IMGURL_ALTERNATIVE === 'string') {
+      image = item.IMGURL_ALTERNATIVE;
+    } else if (typeof item.IMGURL === 'string') {
+      // fallback na hlavný IMGURL
+      image = item.IMGURL;
+    }
 
     // PARAM môže byť objekt alebo pole → spravíme text
     let paramText = '';
@@ -113,11 +119,11 @@ function parseProducts(xmlString) {
 // EMBEDDING – s orezom textu aby neprekročil limity modelu!
 // ─────────────────────────────────────────────────────────────
 
-async function embedDocuments(docs) {
+async function embedDocuments(docs: any[]) {
   console.log(`➡ Vytváram embeddingy pre ${docs.length} produktov...`);
 
   const BATCH_SIZE = 64;
-  const out = [];
+  const out: any[] = [];
   const MAX_CHARS = 4000; // bezpečný limit (cca 1500 tokenov)
 
   for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -162,7 +168,7 @@ async function main() {
 
     // ensure data folder
     const dataDir = path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
+    if (!fs.existsExistsSync?.(dataDir) && !fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
 
