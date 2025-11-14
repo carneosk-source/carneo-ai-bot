@@ -1,6 +1,33 @@
 (function () {
   const API_BASE = 'https://carneo-ai-bot.onrender.com';
 
+  // 🔹 trvalý sessionId v localStorage
+  let sessionId = null;
+  try {
+    sessionId = window.localStorage.getItem('carneoChatSessionId');
+    if (!sessionId) {
+      sessionId =
+        'web-' +
+        Date.now().toString(36) +
+        '-' +
+        Math.random().toString(36).slice(2, 8);
+      window.localStorage.setItem('carneoChatSessionId', sessionId);
+    }
+  } catch (e) {
+    // ak localStorage zlyhá, vygenerujeme aspoň dočasný
+    sessionId =
+      'web-' +
+      Date.now().toString(36) +
+      '-' +
+      Math.random().toString(36).slice(2, 8);
+  }
+
+  let currentMode = null; // 'product' | 'order' | 'tech' | null
+  let busy = false;
+  ...
+(function () {
+  const API_BASE = 'https://carneo-ai-bot.onrender.com';
+
   let currentMode = null; // 'product' | 'order' | 'tech' | null
   let busy = false;
 
