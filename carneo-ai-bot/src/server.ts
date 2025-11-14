@@ -315,7 +315,7 @@ Pokyny:
       }))
     });
 
-    res.json({
+        res.json({
       answer,
       sources: hits.map((h) => ({
         file: (h as any).meta?.file || (h as any).meta?.name,
@@ -323,16 +323,7 @@ Pokyny:
         url: (h as any).meta?.url
       }))
     });
-
-    res.json({
-      answer,
-      sources: hits.map((h) => ({
-        file: (h as any).meta?.file || (h as any).meta?.name,
-        id: h.id,
-        url: (h as any).meta?.url
-      }))
-    });
-    } catch (error) {
+  } catch (error) {
     console.error('Ask error:', error);
     try {
       appendChatLog({
