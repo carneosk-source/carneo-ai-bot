@@ -60,7 +60,10 @@ function parseProducts(xmlString) {
     const manufacturer = item.MANUFACTURER || '';
     const description = item.DESCRIPTION || '';
     const params = item.PARAM || [];
-    const image = item.IMGURL || '';
+    const image =item.IMGURL ||
+  item.IMGURL_ALTERNATIVE ||
+  (Array.isArray(item.IMGURL_ALTERNATIVE) ? item.IMGURL_ALTERNATIVE[0] : '') ||
+  '';
 
     // PARAM môže byť objekt alebo pole → spravíme text
     let paramText = '';
