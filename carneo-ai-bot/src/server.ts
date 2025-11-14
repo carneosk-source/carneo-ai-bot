@@ -23,29 +23,87 @@ app.post('/api/ask', async (req, res) => {
       question?: string;
       mode?: 'product' | 'order' | 'tech' | null;
     };
-        // heuristika: ak nepríde mode, ale otázka vyzerá ako výber produktu,
-    // automaticky prepni na produktový režim
-    let effectiveMode: 'product' | 'order' | 'tech' | null = mode ?? null;
-
-    if (!effectiveMode) {
-      const q = question.toLowerCase();
-      const isProductQuery =
-        q.includes('hodink') ||
-        q.includes('prste') ||    // prsteň / prsten
-        q.includes('naramok') ||
-        q.includes('náramok') ||
-        q.includes('remienok') ||
-        q.includes('produkt') ||
-        q.includes('gps');
-
-      if (isProductQuery) {
-        effectiveMode = 'product';
-      }
-    }
-
+        // 1) Najprv skontroluj otázku
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Missing question' });
     }
+
+    // ------------------------------------------
+// AUTOMATICKÉ ROZPOZNANIE TYPU OTÁZKY
+// ------------------------------------------
+
+let effectiveMode: 'product' | 'order' | 'tech' | null = mode ?? null;
+
+// Ak používateľ neklikol žiadnu možnosť vo widgete,
+/// automaticky odhadneme podľa textu otázky.
+if (!effectiveMode) {
+  const q = question.toLowerCase();
+
+  const isOrder =
+    q.includes('objednavk') ||
+    q.includes('objednávk') ||
+    q.includes('cislo objednavky') ||
+    q.includes('číslo objednávky') ||
+    q.includes('dorucen') ||
+    q.includes('doručen') ||
+    q.includes('doprava') ||
+    q.includes('dodanie') ||
+    q.includes('faktura') ||
+    q.includes('faktúra') ||
+    q.includes('reklamaci') ||
+    q.includes('reklamáci') ||
+    q.includes('vratenie') ||
+    q.includes('vrátenie') ||
+    q.includes('vratka');
+
+  const isTech =
+    q.includes('nefunguje') ||
+    q.includes('nejde') ||
+    q.includes('spojit') ||
+    q.includes('spojiť') ||
+    q.includes('parovat') ||
+    q.includes('párovať') ||
+    q.includes('parovanie') ||
+    q.includes('párovanie') ||
+    q.includes('bluetooth') ||
+    q.includes('nabija') ||
+    q.includes('nabíja') ||
+    q.includes('nenabija') ||
+    q.includes('nenabíja') ||
+    q.includes('display') ||
+    q.includes('displej') ||
+    q.includes('problem') ||
+    q.includes('problém') ||
+    q.includes('manual') ||
+    q.includes('manuál');
+
+  const isProduct =
+    q.includes('hodink') ||
+    q.includes('naramok') ||
+    q.includes('náramok') ||
+    q.includes('prsten') ||
+    q.includes('prsteň') ||
+    q.includes('gps') ||
+    q.includes('vyber') ||
+    q.includes('výber') ||
+    q.includes('chcem hodinky') ||
+    q.includes('aku by ste odporucili') ||
+    q.includes('akú by ste odporučili') ||
+    q.includes('remienok') ||
+    q.includes('nahradny') ||
+    q.includes('náhradný');
+
+  if (isOrder) {
+    effectiveMode = 'order';
+  } else if (isTech) {
+    effectiveMode = 'tech';
+  } else if (isProduct) {
+    effectiveMode = 'product';
+  } else {
+    // ak sa nič nehodí → nechaj general
+    effectiveMode = 'product'; // môžeš dať aj null alebo general
+  }
+}
 
     // =========================
     // SYSTEM PROMPT (BASE + MODES)
