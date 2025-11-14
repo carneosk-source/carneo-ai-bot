@@ -46,14 +46,22 @@ function appendChatLog(entry: any) {
 
 app.post('/api/ask', async (req, res) => {
   try {
-    const { question, mode } = req.body as {
+     const { question, mode, sessionId } = req.body as {
       question?: string;
       mode?: 'product' | 'order' | 'tech' | null;
+      sessionId?: string | null;
     };
         // 1) Najprv skontroluj otázku
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Missing question' });
     }
+    // 🔹 stabilný sessionId na serveri
+    const sid =
+      typeof sessionId === 'string' && sessionId.trim()
+        ? sessionId.trim()
+        : `srv-${Date.now().toString(36)}-${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
 
     // ------------------------------------------
 // AUTOMATICKÉ ROZPOZNANIE TYPU OTÁZKY
@@ -290,6 +298,31 @@ Pokyny:
       (response as any).output_text ??
       (response as any).content?.[0]?.text ??
       '—';
+      
+    // 🔹 uloženie logu konverzácie
+    appendChatLog({
+      sessionId: sid,
+      question,
+      answer,
+      modeFromClient: mode ?? null,
+      effectiveMode,
+      domain,
+      ragHits: hits.map((h) => ({
+        id: h.id,
+        name: (h as any).meta?.name || (h as any).meta?.file,
+        url: (h as any).meta?.url,
+        score: (h as any).score
+      }))
+    });
+
+    res.json({
+      answer,
+      sources: hits.map((h) => ({
+        file: (h as any).meta?.file || (h as any).meta?.name,
+        id: h.id,
+        url: (h as any).meta?.url
+      }))
+    });
 
     res.json({
       answer,
