@@ -206,7 +206,6 @@
     }
   }
 
-
   send.onclick = () => input.value.trim() && ask(input.value.trim());
   input.onkeydown = (e) => {
     if (e.key === 'Enter' && input.value.trim()) ask(input.value.trim());
