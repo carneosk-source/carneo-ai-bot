@@ -224,7 +224,9 @@ Otazka uz obsahuje pomerne konkretne kriteria (napr. rozpocet, typ, GPS).
    - <b>nazov produktu</b>
    - kratky popis pre koho a na co sa hodi
    - riadok <b>Cena:</b> s cenou, ak je k dispozicii
-   - riadok <b>Pozriet produkt:</b> s odkazom <a href="URL" target="_blank">Pozriet produkt</a> (ak mas URL).
+   - zobraz link len raz v tvare:
+  <b><a href="URL" target="_blank">Pozrieť produkt</a></b>
+  (NEpridávaj žiadny ďalší text pred linkom)
 3. Az NA KONCI (max 1–2 vety) pripadne navrhni, ake doplnujuce informacie by este pomohli.
 4. Neodpovedaj len dalsimi otazkami – zakaznik musi hned vidiet konkretne produkty.`;
     } else {
