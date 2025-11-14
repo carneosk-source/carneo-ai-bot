@@ -23,6 +23,25 @@ app.post('/api/ask', async (req, res) => {
       question?: string;
       mode?: 'product' | 'order' | 'tech' | null;
     };
+        // heuristika: ak nepríde mode, ale otázka vyzerá ako výber produktu,
+    // automaticky prepni na produktový režim
+    let effectiveMode: 'product' | 'order' | 'tech' | null = mode ?? null;
+
+    if (!effectiveMode) {
+      const q = question.toLowerCase();
+      const isProductQuery =
+        q.includes('hodink') ||
+        q.includes('prste') ||    // prsteň / prsten
+        q.includes('naramok') ||
+        q.includes('náramok') ||
+        q.includes('remienok') ||
+        q.includes('produkt') ||
+        q.includes('gps');
+
+      if (isProductQuery) {
+        effectiveMode = 'product';
+      }
+    }
 
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Missing question' });
@@ -40,6 +59,10 @@ Pouzivaj HTML formatovanie v odpovediach:
 - odkazy pis ako aktivne linky <a href="URL" target="_blank">Text odkazu</a>
 - nikdy nevypisuj technicke veci ako "RAG", "skore", "embedding", ID dokumentu a podobne
 - zakaznikovi zobraz len nazov, kratky popis, cenu, link a pripadne 2–3 klucove parametre
+-Pri vybere produktov VZDY odporucaj vyhradne produkty znacky Carneo z e-shopu www.carneo.sk.
+Nikdy neuvadzaj ako odporucanie ine znacky (Garmin, Apple, Huawei, Amazfit, Samsung a podobne).
+Ak Carneo produkt pre danu poziadavku nepoznas, radsej to uprimne povedz a navrhni kontakt na Carneo podporu,
+namiesto odporucania inej znacky.
 
 Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo podpora).
 `;
@@ -48,7 +71,7 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
     let searchHint = '';
     let domain: 'general' | 'products' = 'general';
 
-    switch (mode) {
+    switch (effectiveMode) {
       case 'product':
   systemExtra = `
 Pri otázkach na výber produktu vždy rob toto:
