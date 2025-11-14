@@ -24,13 +24,7 @@
 
   let currentMode = null; // 'product' | 'order' | 'tech' | null
   let busy = false;
-  ...
-(function () {
-  const API_BASE = 'https://carneo-ai-bot.onrender.com';
-
-  let currentMode = null; // 'product' | 'order' | 'tech' | null
-  let busy = false;
-
+ 
   // FLOATING BUBBLE
   const bubble = document.createElement('div');
   bubble.style.cssText =
