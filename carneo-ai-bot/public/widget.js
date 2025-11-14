@@ -198,6 +198,7 @@
         body: JSON.stringify({
           question: q,
           mode: currentMode // 'product' | 'order' | 'tech' | null
+          sessionId
         })
       });
       const data = await r.json();
