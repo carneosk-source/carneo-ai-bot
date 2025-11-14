@@ -332,8 +332,15 @@ Pokyny:
         url: (h as any).meta?.url
       }))
     });
-  } catch (error) {
+    } catch (error) {
     console.error('Ask error:', error);
+    try {
+      appendChatLog({
+        sessionId: (req.body && req.body.sessionId) || 'unknown',
+        question: req.body?.question,
+        error: String(error)
+      });
+    } catch {}
     res.status(500).json({ error: 'Server error' });
   }
 });
