@@ -115,19 +115,51 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
       })
       .join('\n');
 
-    const prompt = `Otazka zakaznika:
+        // ─────────────────────────────────────────────
+    // Heuristika: je otázka dostatočne špecifická?
+    // (rozpočet, GPS, pánske/dámske, šport atď.)
+    // ─────────────────────────────────────────────
+    const isSpecificProductQuery =
+      mode === 'product' &&
+      /(\b\d+\s?(eur|€)\b|\bgps\b|\bpánsk|\bpanske|\bdámsk|\bdamske|\bdetsk|\bbehu|\bbeh\b|\bplávan|\bplavani|\bcyklo)/i.test(
+        question
+      );
+
+    let prompt: string;
+
+    if (isSpecificProductQuery) {
+      // Otázka je už dosť konkrétna → rovno odporuč produkty
+      prompt = `Otazka zakaznika:
 ${question}
 
-INTERNY KONTEXT – TOTO NEZOBRAZUJ zakaznikovi, len z neho cerpaj informacie:
+Kontekst (relevantne pasaze zo znalostnej baze Carneo):
 ${citations}
 
 Pokyny:
-- Pouzi informacie z pasazi vyssie, ale necituj ich doslova.
-- NEpouzivaj slova ako "RAG", "embedding", "skore", "zdroj" a podobne.
+Otazka uz obsahuje pomerne konkretne kriteria (napr. rozpocet, typ, GPS).
+1. Hned odporuc 1 az 3 najvhodnejsie produkty znacky Carneo.
+2. Pri kazdom produkte vytvor blok:
+   - cislo v zozname (1., 2., 3.)
+   - <b>nazov produktu</b>
+   - kratky popis pre koho a na co sa hodi
+   - riadok <b>Cena:</b> s cenou, ak je k dispozicii
+   - riadok <b>Pozriet produkt:</b> s odkazom <a href="URL" target="_blank">Pozriet produkt</a> (ak mas URL).
+3. Az NA KONCI (max 1–2 vety) pripadne navrhni, ake doplnujuce informacie by este pomohli.
+4. Neodpovedaj len dalsimi otazkami – zakaznik musi hned vidiet konkretne produkty.`;
+    } else {
+      // Menej konkrétna otázka → môžeš si vypýtať doplnenie
+      prompt = `Otazka zakaznika:
+${question}
+
+Kontekst (relevantne pasaze zo znalostnej baze Carneo):
+${citations}
+
+Pokyny:
+- Pouzi informacie z pasazi vyssie.
+- Odpovedaj vecne, v kratkych odstavcoch.
 - Pri rezime "vyber produktu" uprednostnuj produkty Carneo a pouzi meta.url ako odkaz, ak je k dispozicii.
-- Odpovedaj vecne, v kratkych odstavcoch alebo bodoch.
-- Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj.
-`;
+- Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj, ale zaroven skus na zaklade dostupnych udajov aspon orientacne poradit.`;
+    }
 
     const response = await openai.responses.create({
       model: MODEL,
@@ -145,9 +177,9 @@ Pokyny:
     res.json({
       answer,
       sources: hits.map((h) => ({
-        file: h.meta?.file || h.meta?.name,
+        file: (h as any).meta?.file || (h as any).meta?.name,
         id: h.id,
-        url: (h.meta as any)?.url
+        url: (h as any).meta?.url
       }))
     });
   } catch (error) {
