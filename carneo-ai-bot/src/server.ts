@@ -224,13 +224,15 @@ ${citations}
 Pokyny:
 Otazka uz obsahuje pomerne konkretne kriteria (napr. rozpocet, typ, GPS).
 1. Hned odporuc 1 az 3 najvhodnejsie produkty znacky Carneo.
-2. Pri kazdom produkte vytvor blok:
+2. Pre KAZDY odporucany produkt pouzi presne TENTO HTML format:
    - cislo v zozname (1., 2., 3.)
-   - <b>nazov produktu</b>
+   - <b>{NAZOV PRODUKTU}</b><br>
+   - ak je v pasazi "IMAGE: ...", vloz samostatny riadok:<img src="{IMAGE_URL}" alt="{NAZOV PRODUKTU}" style="max-width:100%;border-radius:8px;margin:8px 0;"><br>
    - kratky popis pre koho a na co sa hodi
-   - riadok <b>Cena:</b> s cenou, ak je k dispozicii
-   - zobraz link len raz v tvare:
-  <b><a href="URL" target="_blank">Pozrieť produkt</a></b>
+   - na samostatny riadok napis:
+   <b>Cena: {CENA} EUR</b><br>
+   - na dalsi riadok napis:
+   <b><a href="{URL}" target="_blank">Pozriet produkt</a></b><br>
   (NEpridávaj žiadny ďalší text pred linkom)
 3. Az NA KONCI (max 1–2 vety) pripadne navrhni, ake doplnujuce informacie by este pomohli.
 4. Neodpovedaj len dalsimi otazkami – zakaznik musi hned vidiet konkretne produkty.`;
