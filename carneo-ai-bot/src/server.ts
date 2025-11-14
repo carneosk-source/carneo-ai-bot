@@ -19,6 +19,31 @@ app.get('/', (_req, res) => {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 
+const LOG_FILE = path.join(process.cwd(), 'data', 'chat-logs.jsonl');
+
+function appendChatLog(entry: any) {
+  try {
+    const dir = path.dirname(LOG_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const line =
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        ...entry
+      }) + '\n';
+
+    fs.appendFile(LOG_FILE, line, (err) => {
+      if (err) {
+        console.error('Chat log write error:', err);
+      }
+    });
+  } catch (err) {
+    console.error('Chat log serialize error:', err);
+  }
+}
+
 app.post('/api/ask', async (req, res) => {
   try {
     const { question, mode } = req.body as {
