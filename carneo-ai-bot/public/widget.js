@@ -206,8 +206,6 @@
     }
   }
 
-  const send = document.getElementById('carneo-chat-send');
-  const input = document.getElementById('carneo-chat-input');
 
   send.onclick = () => input.value.trim() && ask(input.value.trim());
   input.onkeydown = (e) => {
