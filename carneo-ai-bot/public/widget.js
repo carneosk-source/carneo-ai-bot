@@ -1,7 +1,7 @@
 (function () {
   const API_BASE = 'https://carneo-ai-bot.onrender.com';
 
-  // 🔹 trvalý sessionId v localStorage
+  // 🔹 trvalý sessionId v localStorage – kvôli logovaniu na serveri
   let sessionId = null;
   try {
     sessionId = window.localStorage.getItem('carneoChatSessionId');
@@ -14,7 +14,6 @@
       window.localStorage.setItem('carneoChatSessionId', sessionId);
     }
   } catch (e) {
-    // ak localStorage zlyhá, vygenerujeme aspoň dočasný
     sessionId =
       'web-' +
       Date.now().toString(36) +
@@ -24,7 +23,7 @@
 
   let currentMode = null; // 'product' | 'order' | 'tech' | null
   let busy = false;
- 
+
   // FLOATING BUBBLE
   const bubble = document.createElement('div');
   bubble.style.cssText =
@@ -67,29 +66,29 @@
     wrap.style.display = 'flex';
     wrap.style.justifyContent = who === 'you' ? 'flex-end' : 'flex-start';
 
-    const bubble = document.createElement('div');
-    bubble.style.maxWidth = '80%';
-    bubble.style.padding = '8px 10px';
-    bubble.style.borderRadius = '14px';
-    bubble.style.whiteSpace = 'pre-wrap';
-    bubble.style.fontSize = '14px';
+    const bubbleEl = document.createElement('div');
+    bubbleEl.style.maxWidth = '80%';
+    bubbleEl.style.padding = '8px 10px';
+    bubbleEl.style.borderRadius = '14px';
+    bubbleEl.style.whiteSpace = 'pre-wrap';
+    bubbleEl.style.fontSize = '14px';
 
     if (who === 'you') {
-      bubble.style.background = '#111';
-      bubble.style.color = '#fff';
-      bubble.style.borderBottomRightRadius = '4px';
+      bubbleEl.style.background = '#111';
+      bubbleEl.style.color = '#fff';
+      bubbleEl.style.borderBottomRightRadius = '4px';
       // zákazník – čistý text (bez HTML)
-      bubble.innerText = text;
+      bubbleEl.innerText = text;
     } else {
-      bubble.style.background = '#fff';
-      bubble.style.color = '#222';
-      bubble.style.borderBottomLeftRadius = '4px';
-      bubble.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
-      // AI – HTML (link, <b>, atď.)
-      bubble.innerHTML = text;
+      bubbleEl.style.background = '#fff';
+      bubbleEl.style.color = '#222';
+      bubbleEl.style.borderBottomLeftRadius = '4px';
+      bubbleEl.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+      // AI – HTML (link, <b>, <img>...)
+      bubbleEl.innerHTML = text;
     }
 
-    wrap.appendChild(bubble);
+    wrap.appendChild(bubbleEl);
     log.appendChild(wrap);
     log.scrollTop = log.scrollHeight;
   }
@@ -191,7 +190,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: q,
-          mode: currentMode // 'product' | 'order' | 'tech' | null
+          mode: currentMode, // 'product' | 'order' | 'tech' | null
           sessionId
         })
       });
@@ -206,6 +205,9 @@
       busy = false;
     }
   }
+
+  const send = document.getElementById('carneo-chat-send');
+  const input = document.getElementById('carneo-chat-input');
 
   send.onclick = () => input.value.trim() && ask(input.value.trim());
   input.onkeydown = (e) => {
