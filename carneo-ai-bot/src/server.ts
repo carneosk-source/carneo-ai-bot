@@ -201,10 +201,10 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
     // (rozpočet, GPS, pánske/dámske, šport atď.)
     // ─────────────────────────────────────────────
     const isSpecificProductQuery =
-      mode === 'product' &&
-      /(\b\d+\s?(eur|€)\b|\bgps\b|\bpánsk|\bpanske|\bdámsk|\bdamske|\bdetsk|\bbehu|\bbeh\b|\bplávan|\bplavani|\bcyklo)/i.test(
-        question
-      );
+  effectiveMode === 'product' &&
+  /(\b\d+\s?(eur|€)\b|\bgps\b|\bpánsk|\bpanske|\bdámsk|\bdamske|\bdetsk|\bbehu|\bbeh\b|\bplávan|\bplavani|\bcyklo)/i.test(
+    question
+  );
 
     let prompt: string;
 
