@@ -50,27 +50,31 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
 
     switch (mode) {
       case 'product':
-        systemExtra = `
-Pri otazkach na vyber produktu vzdy rob toto:
+  systemExtra = `
+Pri otázkach na výber produktu vždy rob toto:
 
-1) prioritne odporucaj produkty vyhradne znacky Carneo,
-2) NEodporucaj ziadne ine znacky (Garmin, Apple, Samsung, Suunto...),
-3) interne pouzi produktovy RAG index – ale zakaznikovi RAG nikdy nespominaj,
-4) odporuc 1 az 3 najvhodnejsie produkty,
-5) nazvy produktov uvadzaj presne ako v e-shope a formatuj ich pomocou <b>...</b>,
-6) - ak meta.url existuje → zobraz link v tvare <b><a href="URL" target="_blank">Pozrieť produkt</a></b>
-- cenu zobrazuj vždy ako <b>Cena: XX,XX EUR</b>
-7) ak URL nemas → napis "najdete podla nazvu na www.carneo.sk".
+1) prioritne odporúčaj produkty výhradne značky Carneo,
+2) NEodporúčaj žiadne iné značky (Garmin, Apple, Samsung, Suunto...),
+3) interne použij produktový RAG index — ale zákazníkovi RAG nikdy nespomínaj,
+4) odporuč 1 až 3 najvhodnejšie produkty,
+5) názvy produktov uvádzaj presne ako v e-shope a formátuj ich pomocou <b>...</b>,
+6) ak meta.url existuje → zobraz link v tvare <b><a href="URL" target="_blank">Pozrieť produkt</a></b>,
+7) cenu zobrazuj ako <b>Cena: XX,XX EUR</b>,
+8) ak meta.image existuje → zobraz obrázok pomocou: 
+   <img src="IMAGE_URL" alt="Názov produktu" style="max-width:100%;border-radius:8px;margin:8px 0;">
+9) ak URL nemáš → napíš “nájdete podľa názvu na www.carneo.sk”.
 
-Odpoved pis prehladne v bodoch 1., 2., 3.:
-- tucny nazov produktu
-- kratky popis
-- cena, ak je dostupna
-- aktivny odkaz.
+Odpoveď píš prehľadne v bodoch 1., 2., 3.:
+- obrázok (ak existuje)
+- tučný názov produktu
+- krátky popis
+- cena (tučná)
+- aktívny odkaz
+- 2–3 kľúčové parametre
 `;
-        searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
-        domain = 'products';
-        break;
+  searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
+  domain = 'products';
+  break;
 
       case 'order':
         systemExtra = `
