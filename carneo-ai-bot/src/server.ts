@@ -405,6 +405,92 @@ app.get('/admin/chat-logs', (req, res) => {
   });
 });
 
+// ==========================
+//  ADMIN API – logy a štatistiky
+// ==========================
+
+function requireAdminKey(req: any, res: any, next: any) {
+  const adminKey = process.env.ADMIN_KEY;
+  if (!adminKey) {
+    return res.status(500).json({ error: 'ADMIN_KEY is not configured' });
+  }
+
+  const fromQuery = (req.query.key as string) || '';
+  const fromHeader = (req.headers['x-admin-key'] as string) || '';
+  const provided = fromQuery || fromHeader;
+
+  if (!provided || provided !== adminKey) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  next();
+}
+
+// GET /api/admin/logs?key=...&limit=100&mode=product&q=hodinky
+app.get('/api/admin/logs', requireAdminKey, (req, res) => {
+  try {
+    const all = readChatLogs();
+
+    const limit = Math.min(
+      500,
+      Math.max(1, parseInt(String(req.query.limit || '200'), 10))
+    );
+    const modeFilter = (req.query.mode as string) || '';
+    const q = ((req.query.q as string) || '').toLowerCase();
+
+    let filtered = all;
+
+    if (modeFilter) {
+      filtered = filtered.filter(
+        (e) =>
+          (e.effectiveMode && String(e.effectiveMode) === modeFilter) ||
+          (e.modeFromClient && String(e.modeFromClient) === modeFilter)
+      );
+    }
+
+    if (q) {
+      filtered = filtered.filter((e) => {
+        const text =
+          (e.question || '') + ' ' + (e.answer || '');
+        return text.toLowerCase().includes(q);
+      });
+    }
+
+    // najnovšie ako prvé
+    filtered = filtered.sort(
+      (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+    );
+
+    res.json(filtered.slice(0, limit));
+  } catch (err) {
+    console.error('Admin logs error:', err);
+    res.status(500).json({ error: 'Cannot read logs' });
+  }
+});
+
+// jednoduché štatistiky – počty podľa režimu atď.
+app.get('/api/admin/stats', requireAdminKey, (req, res) => {
+  try {
+    const all = readChatLogs();
+
+    const byMode: Record<string, number> = {};
+    const total = all.length;
+
+    for (const e of all) {
+      const m = e.effectiveMode || e.modeFromClient || 'unknown';
+      byMode[m] = (byMode[m] || 0) + 1;
+    }
+
+    res.json({
+      total,
+      byMode
+    });
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({ error: 'Cannot compute stats' });
+  }
+});
+
 // Zdravie
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
