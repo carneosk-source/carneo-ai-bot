@@ -335,6 +335,49 @@ Pokyny:
     res.status(500).json({ error: 'Server error' });
   }
 });
+// ============ ADMIN: PREHĽAD POSLEDNÝCH CHATOV ============
+app.get('/admin/chat-logs', (req, res) => {
+  const token = req.query.token as string | undefined;
+  const adminToken = process.env.ADMIN_LOGS_TOKEN;
+
+  // musí byť nastavený v env na Renderi
+  if (!adminToken) {
+    return res
+      .status(500)
+      .json({ error: 'ADMIN_LOGS_TOKEN nie je nastavený na serveri' });
+  }
+
+  // jednoduchá ochrana heslom v query stringu
+  if (token !== adminToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  fs.readFile(LOG_FILE, 'utf8', (err, data) => {
+    if (err) {
+      if ((err as any).code === 'ENOENT') {
+        // súbor ešte neexistuje – žiadne logy
+        return res.json([]);
+      }
+      console.error('Read log error:', err);
+      return res.status(500).json({ error: 'Log read error' });
+    }
+
+    const lines = data
+      .split('\n')
+      .filter((l) => l.trim().length > 0);
+
+    // vezmeme posledných 100 záznamov
+    const last = lines.slice(-100).map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return { raw: line };
+      }
+    });
+
+    res.json(last);
+  });
+});
 
 // Zdravie
 app.get('/health', (_req, res) => res.json({ ok: true }));
