@@ -491,6 +491,54 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
   }
 });
 
+// ADMIN API – čítanie chat logov
+app.get('/api/admin/chat-logs', (req, res) => {
+  try {
+    const adminKey = req.query.adminKey;
+    const MODE = req.query.mode || '';
+    const SEARCH = (req.query.search || '').toString().toLowerCase();
+    const LIMIT = Number(req.query.limit || 200);
+
+    // kontrola admin key
+    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ error: 'Invalid admin key' });
+    }
+
+    if (!fs.existsSync(LOG_FILE)) {
+      return res.json([]); // žiadne logy zatiaľ
+    }
+
+    const lines = fs.readFileSync(LOG_FILE, 'utf8')
+      .trim()
+      .split('\n')
+      .reverse(); // najnovšie hore
+
+    const out: any[] = [];
+
+    for (const line of lines) {
+      if (out.length >= LIMIT) break;
+
+      try {
+        const row = JSON.parse(line);
+
+        // FILTER: režim
+        if (MODE && row.effectiveMode !== MODE && row.modeFromClient !== MODE)
+          continue;
+
+        // FILTER: hľadanie v texte
+        const fullText = `${row.question || ''} ${row.answer || ''}`.toLowerCase();
+        if (SEARCH && !fullText.includes(SEARCH)) continue;
+
+        out.push(row);
+      } catch (_) {}
+    }
+
+    res.json(out);
+  } catch (err) {
+    console.error('admin log error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 // Zdravie
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
