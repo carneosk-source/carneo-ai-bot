@@ -539,6 +539,72 @@ app.get('/api/admin/chat-logs', (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+app.get('/api/admin/chat-logs', (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_KEY || '';
+    const provided = String(req.query.key || '');
+
+    if (!adminKey || provided !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const modeFilter = String(req.query.mode || ''); // 'product' | 'order' | 'tech' | ''
+    const search = String(req.query.q || '').toLowerCase();
+    const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
+    const onlyErrors = String(req.query.onlyErrors || '') === '1';
+
+    if (!fs.existsSync(LOG_FILE)) {
+      return res.json({ items: [], stats: { total: 0, withError: 0 } });
+    }
+
+    const raw = fs.readFileSync(LOG_FILE, 'utf-8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .reverse(); // najnovšie hore
+
+    const items: any[] = [];
+    let total = 0;
+    let withError = 0;
+
+    for (const line of raw) {
+      if (items.length >= limit) break;
+
+      let entry: any;
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      total++;
+
+      const hasError = !!entry.error;
+      if (onlyErrors && !hasError) continue;
+
+      if (modeFilter && entry.effectiveMode !== modeFilter) continue;
+
+      if (search) {
+        const blob = `${entry.question || ''}\n${entry.answer || ''}`.toLowerCase();
+        if (!blob.includes(search)) continue;
+      }
+
+      if (hasError) withError++;
+
+      items.push(entry);
+    }
+
+    res.json({
+      items,
+      stats: { total, withError }
+    });
+  } catch (e) {
+    console.error('admin logs error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Zdravie
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
