@@ -21,6 +21,32 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 
 const LOG_FILE = path.join(process.cwd(), 'data', 'chat-logs.jsonl');
 
+function readChatLogs(): any[] {
+  try {
+    if (!fs.existsSync(LOG_FILE)) {
+      return [];
+    }
+    const raw = fs.readFileSync(LOG_FILE, 'utf-8');
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const out: any[] = [];
+    for (const line of lines) {
+      try {
+        out.push(JSON.parse(line));
+      } catch {
+        // ignoruj pokazený riadok
+      }
+    }
+    return out;
+  } catch (e) {
+    console.error('Cannot read chat logs:', e);
+    return [];
+  }
+}
+
 function appendChatLog(entry: any) {
   try {
     const dir = path.dirname(LOG_FILE);
