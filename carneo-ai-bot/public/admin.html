@@ -377,6 +377,37 @@
         });
       }
 
+      function renderRow(item) {
+  const tr = document.createElement('tr');
+
+  // ak je chyba, daj iné pozadie
+  if (item.error) {
+    tr.style.background = '#ffe5e5';     // jemne červené
+  }
+
+  const tdTime = document.createElement('td');
+  tdTime.textContent = new Date(item.ts).toLocaleString('sk-SK');
+
+  const tdSession = document.createElement('td');
+  tdSession.textContent = item.sessionId || '-';
+
+  const tdMode = document.createElement('td');
+  tdMode.textContent = item.effectiveMode || '-';
+
+  const tdQuestion = document.createElement('td');
+  tdQuestion.textContent = item.question || '-';
+
+  tr.appendChild(tdTime);
+  tr.appendChild(tdSession);
+  tr.appendChild(tdMode);
+  tr.appendChild(tdQuestion);
+
+  // klik – detail vpravo
+  tr.onclick = () => showDetail(item);
+
+  return tr;
+}
+
       function showDetail(entry) {
         if (!entry) return;
 
