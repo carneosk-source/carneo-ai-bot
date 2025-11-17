@@ -367,6 +367,7 @@ Pokyny:
 app.get('/api/admin/chat-logs', async (req, res) => {
   try {
     const { adminKey, mode, search, limit } = req.query;
+    const key = String(adminKey || '');
 
     if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
       return res.status(403).json({ error: 'Forbidden' });
