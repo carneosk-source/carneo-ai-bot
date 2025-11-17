@@ -726,14 +726,18 @@
           }
           if (onlyErrors && !entry.error) return false;
 
-          if (search) {
-            const blob = `${entry.question || ''}\n${
-              entry.answer || ''
-            }\n${entry.error || ''}`.toLowerCase();
-            if (!blob.includes(search)) return false;
-          }
-          return true;
-        });
+          if (ratingFilter) {
+      if (entry.adminRating !== ratingFilter) return false;
+    }
+
+    if (search) {
+      const blob = `${entry.question || ''}\n${
+        entry.answer || ''
+      }\n${entry.error || ''}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
 
         computeStats(currentLogs);
         renderTable(currentLogs);
