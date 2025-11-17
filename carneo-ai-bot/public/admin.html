@@ -508,7 +508,23 @@
       stats.withRating++;
       stats.ratingBad++;
     }
+function updateRatingBadges() {
+  badgeGood.classList.toggle('active', ratingFilter === 'good');
+  badgeBad.classList.toggle('active', ratingFilter === 'bad');
+}
 
+badgeGood.addEventListener('click', () => {
+  // toggle: klik na active badge filter vypne
+  ratingFilter = ratingFilter === 'good' ? '' : 'good';
+  updateRatingBadges();
+  applyFilters();
+});
+
+badgeBad.addEventListener('click', () => {
+  ratingFilter = ratingFilter === 'bad' ? '' : 'bad';
+  updateRatingBadges();
+  applyFilters();
+});
           // veľmi jednoduchá heuristika "všeobecná odpoveď"
           if (mode === 'product') {
             const ans = entry.answer || '';
