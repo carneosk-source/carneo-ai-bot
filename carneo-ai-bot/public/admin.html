@@ -431,6 +431,13 @@
       const detailInfo = document.getElementById('detailInfo');
       const detailBody = document.getElementById('detailBody');
       const qualityStats = document.getElementById('qualityStats');
+      const badgeGood = document.getElementById('badgeGood');
+      const badgeBad = document.getElementById('badgeBad');
+      const goodCountSpan = document.getElementById('goodCount');
+      const badCountSpan = document.getElementById('badCount');
+
+      // aktuálne zvolený filter hodnotenia: '', 'good', 'bad'
+      let ratingFilter = '';
 
       // plný zoznam z backendu
       let allLogs = [];
