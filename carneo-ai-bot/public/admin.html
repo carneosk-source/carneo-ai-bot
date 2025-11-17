@@ -412,7 +412,7 @@
       </section>
     </div>
 
-    <script>
+        <script>
       const adminKeyInput = document.getElementById('adminKey');
       const modeFilter = document.getElementById('modeFilter');
       const searchText = document.getElementById('searchText');
@@ -431,6 +431,7 @@
       const detailInfo = document.getElementById('detailInfo');
       const detailBody = document.getElementById('detailBody');
       const qualityStats = document.getElementById('qualityStats');
+
       const badgeGood = document.getElementById('badgeGood');
       const badgeBad = document.getElementById('badgeBad');
       const goodCountSpan = document.getElementById('goodCount');
@@ -468,64 +469,49 @@
         return Math.round((part / total) * 100) + '%';
       }
 
+      // C2 – výpočet štatistík KVALITY pre aktuálny filter
       function computeStats(logs) {
-  const stats = {
-    total: logs.length,
-    product: 0,
-    order: 0,
-    tech: 0,
-    errors: 0,
-    withRating: 0,
-    ratingGood: 0,
-    ratingBad: 0,
-    withRag: 0,
-    withoutRag: 0,
-    genericAnswers: 0
-  };
+        const stats = {
+          total: logs.length,
+          product: 0,
+          order: 0,
+          tech: 0,
+          errors: 0,
+          withRating: 0,
+          ratingGood: 0,
+          ratingBad: 0,
+          withRag: 0,
+          withoutRag: 0,
+          genericAnswers: 0
+        };
 
-  logs.forEach((entry) => {
-    const mode = entry.effectiveMode || entry.modeFromClient || '';
-    if (mode === 'product') stats.product++;
-    else if (mode === 'order') stats.order++;
-    else if (mode === 'tech') stats.tech++;
+        logs.forEach((entry) => {
+          const mode = entry.effectiveMode || entry.modeFromClient || '';
+          if (mode === 'product') stats.product++;
+          else if (mode === 'order') stats.order++;
+          else if (mode === 'tech') stats.tech++;
 
-    if (entry.error) stats.errors++;
+          if (entry.error) stats.errors++;
 
-    // RAG štatistiky (podporujeme staré aj nové pole)
-    const ragHits = Array.isArray(entry.ragHits)
-      ? entry.ragHits
-      : Array.isArray(entry.rag_hits)
-      ? entry.rag_hits
-      : [];
-    if (ragHits.length > 0) stats.withRag++;
-    else stats.withoutRag++;
+          // RAG štatistiky (podporujeme staré aj nové pole)
+          const ragHits = Array.isArray(entry.ragHits)
+            ? entry.ragHits
+            : Array.isArray(entry.rag_hits)
+            ? entry.rag_hits
+            : [];
+          if (ragHits.length > 0) stats.withRag++;
+          else stats.withoutRag++;
 
-    // manuálne hodnotenie 👍 / 👎
-    if (entry.adminRating === 'good') {
-      stats.withRating++;
-      stats.ratingGood++;
-    } else if (entry.adminRating === 'bad') {
-      stats.withRating++;
-      stats.ratingBad++;
-    }
-function updateRatingBadges() {
-  badgeGood.classList.toggle('active', ratingFilter === 'good');
-  badgeBad.classList.toggle('active', ratingFilter === 'bad');
-}
+          // manuálne hodnotenie 👍 / 👎
+          if (entry.adminRating === 'good') {
+            stats.withRating++;
+            stats.ratingGood++;
+          } else if (entry.adminRating === 'bad') {
+            stats.withRating++;
+            stats.ratingBad++;
+          }
 
-badgeGood.addEventListener('click', () => {
-  // toggle: klik na active badge filter vypne
-  ratingFilter = ratingFilter === 'good' ? '' : 'good';
-  updateRatingBadges();
-  applyFilters();
-});
-
-badgeBad.addEventListener('click', () => {
-  ratingFilter = ratingFilter === 'bad' ? '' : 'bad';
-  updateRatingBadges();
-  applyFilters();
-});
-          // veľmi jednoduchá heuristika "všeobecná odpoveď"
+          // veľmi jednoduchá heuristika "produktová odpoveď bez linku"
           if (mode === 'product') {
             const ans = entry.answer || '';
             if (ans && !ans.includes('<a href=')) {
@@ -534,13 +520,16 @@ badgeBad.addEventListener('click', () => {
           }
         });
 
+        // badge-y hore
         totalCountSpan.textContent = stats.total;
         productCountSpan.textContent = stats.product;
         orderCountSpan.textContent = stats.order;
         techCountSpan.textContent = stats.tech;
         errorCountSpan.textContent = stats.errors;
+        goodCountSpan.textContent = stats.ratingGood;
+        badCountSpan.textContent = stats.ratingBad;
 
-        // C2 – štatistika kvality pre aktuálny filter
+        // box so štatistikou kvality
         if (!stats.total) {
           qualityStats.innerHTML =
             '<span class="muted">Žiadne dáta pre aktuálny filter.</span>';
@@ -553,15 +542,15 @@ badgeBad.addEventListener('click', () => {
           </span>
           <span class="stat-chip rag">
             RAG využitý: <b>${stats.withRag}</b> (${percent(
-          stats.withRag,
-          stats.total
-        )})
+              stats.withRag,
+              stats.total
+            )})
           </span>
           <span class="stat-chip">
             Ohodnotených: <b>${stats.withRating}</b> (${percent(
-          stats.withRating,
-          stats.total
-        )})
+              stats.withRating,
+              stats.total
+            )})
           </span>
           <span class="stat-chip good">
             👍 good: <b>${stats.ratingGood}</b>
@@ -574,6 +563,25 @@ badgeBad.addEventListener('click', () => {
           </span>
         `;
       }
+
+      // vizuálne zvýraznenie aktívneho rating filtra
+      function updateRatingBadges() {
+        badgeGood.classList.toggle('active', ratingFilter === 'good');
+        badgeBad.classList.toggle('active', ratingFilter === 'bad');
+      }
+
+      // klikateľné badge-y 👍 / 👎 (C3 filter)
+      badgeGood.addEventListener('click', () => {
+        ratingFilter = ratingFilter === 'good' ? '' : 'good';
+        updateRatingBadges();
+        applyFilters();
+      });
+
+      badgeBad.addEventListener('click', () => {
+        ratingFilter = ratingFilter === 'bad' ? '' : 'bad';
+        updateRatingBadges();
+        applyFilters();
+      });
 
       function renderTable(logs) {
         tbody.innerHTML = '';
@@ -613,8 +621,8 @@ badgeBad.addEventListener('click', () => {
             </td>
             <td title="${escapeHtml(entry.question || '')}">
               ${escapeHtml(entry.question || '').slice(0, 120)}${
-            (entry.question || '').length > 120 ? '…' : ''
-          }
+                (entry.question || '').length > 120 ? '…' : ''
+              }
             </td>
           `;
 
@@ -672,7 +680,6 @@ badgeBad.addEventListener('click', () => {
                   ${msg.answer || '<span class="muted">(bez odpovede)</span>'}
                 </div>`;
 
-            // rating buttons len ak máme odpoveď (nie error)
             const ratingControls = !isError
               ? `
               <div class="rating-buttons">
@@ -743,17 +750,17 @@ badgeBad.addEventListener('click', () => {
           if (onlyErrors && !entry.error) return false;
 
           if (ratingFilter) {
-      if (entry.adminRating !== ratingFilter) return false;
-    }
+            if (entry.adminRating !== ratingFilter) return false;
+          }
 
-    if (search) {
-      const blob = `${entry.question || ''}\n${
-        entry.answer || ''
-      }\n${entry.error || ''}`.toLowerCase();
-      if (!blob.includes(search)) return false;
-    }
-    return true;
-  });
+          if (search) {
+            const blob = `${entry.question || ''}\n${
+              entry.answer || ''
+            }\n${entry.error || ''}`.toLowerCase();
+            if (!blob.includes(search)) return false;
+          }
+          return true;
+        });
 
         computeStats(currentLogs);
         renderTable(currentLogs);
@@ -776,7 +783,6 @@ badgeBad.addEventListener('click', () => {
 
         try {
           const params = new URLSearchParams();
-          // backend očakáva adminKey/mode/search/limit
           params.set('adminKey', key);
           const mode = modeFilter.value;
           const search = searchText.value.trim();
@@ -792,7 +798,6 @@ badgeBad.addEventListener('click', () => {
             throw new Error('HTTP ' + resp.status + ': ' + txt);
           }
           const data = await resp.json();
-          // očakávame pole logov doplnených o adminRating/adminNote
           allLogs = Array.isArray(data) ? data : [];
 
           applyFilters();
@@ -838,7 +843,6 @@ badgeBad.addEventListener('click', () => {
             throw new Error('HTTP ' + resp.status + ': ' + txt);
           }
 
-          // po úspešnom hodnotení znovu načítame logy (aby sa adminRating/adminNote doplnili)
           await loadLogs();
         } catch (err) {
           console.error('rate error', err);
@@ -892,7 +896,6 @@ badgeBad.addEventListener('click', () => {
           return vals
             .map((v) => {
               const s = String(v);
-              // jednoduchý CSV escape – ak je čiarka alebo úvodzovky, obalíme do "
               if (s.includes(',') || s.includes('"') || s.includes('\n')) {
                 return '"' + s.replace(/"/g, '""') + '"';
               }
