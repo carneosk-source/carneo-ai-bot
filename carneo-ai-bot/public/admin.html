@@ -77,8 +77,7 @@
         gap: 4px;
       }
       input,
-      select,
-      textarea {
+      select {
         font: inherit;
         padding: 4px 8px;
         border-radius: 8px;
@@ -86,8 +85,7 @@
         min-width: 0;
       }
       input:focus,
-      select:focus,
-      textarea:focus {
+      select:focus {
         outline: 2px solid #111827;
         outline-offset: 1px;
       }
@@ -99,10 +97,6 @@
         cursor: pointer;
         background: #111827;
         color: #fff;
-      }
-      button.secondary {
-        background: #e5e7eb;
-        color: #111827;
       }
       button:disabled {
         opacity: 0.5;
@@ -164,9 +158,14 @@
         color: #b91c1c;
         margin-left: 4px;
       }
-      .mode-pill.rag-tag {
-        background: #fbbf24;
-        color: #92400e;
+      .mode-pill.rating-good {
+        background: #dcfce7;
+        color: #15803d;
+        margin-left: 4px;
+      }
+      .mode-pill.rating-bad {
+        background: #fee2e2;
+        color: #b91c1c;
         margin-left: 4px;
       }
       .detail-meta {
@@ -229,45 +228,60 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
-      .rating-bar {
-        margin-top: 8px;
+      .rating-buttons {
+        margin-top: 6px;
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
-        font-size: 13px;
+        flex-wrap: wrap;
       }
-      .rating-bar button {
-        padding: 4px 10px;
-        font-size: 14px;
+      .rating-btn {
+        border-radius: 999px;
+        border: 0;
+        padding: 2px 10px;
+        font-size: 12px;
+        cursor: pointer;
       }
-      .rating-bar button.selected {
-        box-shadow: 0 0 0 2px #111827;
+      .rating-btn.good {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .rating-btn.bad {
+        background: #fee2e2;
+        color: #b91c1c;
       }
       .rating-note {
-        margin-top: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .rating-note textarea {
-        width: 100%;
-        min-height: 60px;
-        resize: vertical;
-      }
-      .rating-note-actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        justify-content: flex-start;
-      }
-      .rating-status {
         font-size: 12px;
         color: #6b7280;
       }
       .muted {
         color: #9ca3af;
         font-size: 13px;
+      }
+      .quality-stats {
+        font-size: 13px;
+        margin-bottom: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      .stat-chip {
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #f3f4f6;
+      }
+      .stat-chip.good {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .stat-chip.bad {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .stat-chip.rag {
+        background: #e0f2fe;
+        color: #075985;
       }
     </style>
   </head>
@@ -280,8 +294,6 @@
         <span class="badge">order: <span id="orderCount">0</span></span>
         <span class="badge">tech: <span id="techCount">0</span></span>
         <span class="badge errors">chyby: <span id="errorCount">0</span></span>
-        <span class="badge">RAG: <span id="ragCount">0</span></span>
-        <span class="badge">generické: <span id="genericCount">0</span></span>
       </div>
     </header>
 
@@ -331,7 +343,14 @@
             iba chyby
           </label>
           <button id="loadBtn">Načítať logy</button>
-          <button id="exportBtn" class="secondary">Export CSV</button>
+          <button id="exportCsvBtn" type="button">Export CSV</button>
+        </div>
+
+        <!-- C2: štatistika kvality (pre aktuálny filter) -->
+        <div id="qualityStats" class="quality-stats">
+          <span class="muted">
+            Štatistika kvality sa zobrazí po načítaní logov.
+          </span>
         </div>
 
         <div
@@ -354,10 +373,13 @@
             <tbody id="logsTbody"></tbody>
           </table>
         </div>
-        <p class="muted">Klikni na riadok pre detail celej konverzácie.</p>
+        <p class="muted">
+          Klikni na riadok pre detail celej konverzácie. Hodnotenie 👍/👎 je v
+          detaile vpravo.
+        </p>
       </section>
 
-      <!-- PRAVO: detail konverzácie + rating -->
+      <!-- PRAVO: detail konverzácie -->
       <section class="card">
         <h2>Detail konverzácie</h2>
         <div id="detailInfo" class="detail-meta">
@@ -366,7 +388,8 @@
         <div id="detailBody" class="detail-body">
           <p class="muted">
             Vyber riadok v tabuľke vľavo – tu sa zobrazí celá konverzácia danej
-            session (otázky a odpovede v poradí).
+            session (otázky a odpovede v poradí). Pri každej odpovedi môžeš
+            kliknúť na 👍/👎 a uložiť hodnotenie.
           </p>
         </div>
       </section>
@@ -379,7 +402,7 @@
       const limitSelect = document.getElementById('limitSelect');
       const errorsOnly = document.getElementById('errorsOnly');
       const loadBtn = document.getElementById('loadBtn');
-      const exportBtn = document.getElementById('exportBtn');
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
       const tbody = document.getElementById('logsTbody');
 
       const totalCountSpan = document.getElementById('totalCount');
@@ -387,18 +410,15 @@
       const orderCountSpan = document.getElementById('orderCount');
       const techCountSpan = document.getElementById('techCount');
       const errorCountSpan = document.getElementById('errorCount');
-      const ragCountSpan = document.getElementById('ragCount');
-      const genericCountSpan = document.getElementById('genericCount');
 
       const detailInfo = document.getElementById('detailInfo');
       const detailBody = document.getElementById('detailBody');
+      const qualityStats = document.getElementById('qualityStats');
 
       // plný zoznam z backendu
       let allLogs = [];
       // aktuálne zobrazené po filtrovaní
       let currentLogs = [];
-      // záznam, ktorý je aktuálne zobrazený v detaile (kliknutý riadok)
-      let currentEntryForDetail = null;
 
       function escapeHtml(str) {
         return String(str || '')
@@ -419,27 +439,9 @@
         }
       }
 
-      function usesRag(entry) {
-        return Array.isArray(entry.ragHits) && entry.ragHits.length > 0;
-      }
-
-      function isGenericAnswer(entry) {
-        const ans = (entry.answer || '').toLowerCase();
-        if (!ans) return false;
-        const phrases = [
-          'kontaktujte našu podporu',
-          'kontaktujte podporu',
-          'kontaktujte carneo podporu',
-          'napíšte na e-mail',
-          'napiste na e-mail',
-          'napíšte nám na',
-          'napiste nam na',
-          'obráťte sa na carneo podporu',
-          'obratte sa na carneo podporu',
-          'eskalaciu na cloveka',
-          'eskaláciu na človeka'
-        ];
-        return phrases.some((p) => ans.includes(p));
+      function percent(part, total) {
+        if (!total) return '0%';
+        return Math.round((part / total) * 100) + '%';
       }
 
       function computeStats(logs) {
@@ -449,8 +451,12 @@
           order: 0,
           tech: 0,
           errors: 0,
-          rag: 0,
-          generic: 0
+          withRating: 0,
+          ratingGood: 0,
+          ratingBad: 0,
+          withRag: 0,
+          withoutRag: 0,
+          genericAnswers: 0
         };
 
         logs.forEach((entry) => {
@@ -460,8 +466,30 @@
           else if (mode === 'tech') stats.tech++;
 
           if (entry.error) stats.errors++;
-          if (usesRag(entry)) stats.rag++;
-          if (isGenericAnswer(entry)) stats.generic++;
+
+          const ragHits = Array.isArray(entry.ragHits)
+            ? entry.ragHits
+            : Array.isArray(entry.rag_hits)
+            ? entry.rag_hits
+            : [];
+          if (ragHits.length > 0) stats.withRag++;
+          else stats.withoutRag++;
+
+          if (entry.adminRating === 'good') {
+            stats.withRating++;
+            stats.ratingGood++;
+          } else if (entry.adminRating === 'bad') {
+            stats.withRating++;
+            stats.ratingBad++;
+          }
+
+          // veľmi jednoduchá heuristika "všeobecná odpoveď"
+          if (mode === 'product') {
+            const ans = entry.answer || '';
+            if (ans && !ans.includes('<a href=')) {
+              stats.genericAnswers++;
+            }
+          }
         });
 
         totalCountSpan.textContent = stats.total;
@@ -469,8 +497,40 @@
         orderCountSpan.textContent = stats.order;
         techCountSpan.textContent = stats.tech;
         errorCountSpan.textContent = stats.errors;
-        ragCountSpan.textContent = stats.rag;
-        genericCountSpan.textContent = stats.generic;
+
+        // C2 – štatistika kvality pre aktuálny filter
+        if (!stats.total) {
+          qualityStats.innerHTML =
+            '<span class="muted">Žiadne dáta pre aktuálny filter.</span>';
+          return;
+        }
+
+        qualityStats.innerHTML = `
+          <span class="stat-chip">
+            Riadkov: <b>${stats.total}</b>
+          </span>
+          <span class="stat-chip rag">
+            RAG využitý: <b>${stats.withRag}</b> (${percent(
+          stats.withRag,
+          stats.total
+        )})
+          </span>
+          <span class="stat-chip">
+            Ohodnotených: <b>${stats.withRating}</b> (${percent(
+          stats.withRating,
+          stats.total
+        )})
+          </span>
+          <span class="stat-chip good">
+            👍 good: <b>${stats.ratingGood}</b>
+          </span>
+          <span class="stat-chip bad">
+            👎 bad: <b>${stats.ratingBad}</b>
+          </span>
+          <span class="stat-chip">
+            Produktové bez linku: <b>${stats.genericAnswers}</b>
+          </span>
+        `;
       }
 
       function renderTable(logs) {
@@ -488,9 +548,12 @@
             ? '<span class="mode-pill error-tag">error</span>'
             : '';
 
-          const ragTag = usesRag(entry)
-            ? '<span class="mode-pill rag-tag">rag</span>'
-            : '';
+          const ratingTag =
+            entry.adminRating === 'good'
+              ? '<span class="mode-pill rating-good">👍</span>'
+              : entry.adminRating === 'bad'
+              ? '<span class="mode-pill rating-bad">👎</span>'
+              : '';
 
           tr.innerHTML = `
             <td>${formatTs(entry.ts)}</td>
@@ -503,8 +566,8 @@
                   ? 'tech'
                   : ''
               }">${mode || '-'}</span>
-              ${ragTag}
               ${hasErrorTag}
+              ${ratingTag}
             </td>
             <td title="${escapeHtml(entry.question || '')}">
               ${escapeHtml(entry.question || '').slice(0, 120)}${
@@ -520,118 +583,18 @@
 
       function showDetail(entry) {
         if (!entry) return;
-        currentEntryForDetail = entry;
 
         const sessionId = entry.sessionId;
         const allForSession = currentLogs
           .filter((e) => e.sessionId === sessionId)
           .sort((a, b) => (a.ts > b.ts ? 1 : -1));
 
-        const rating = entry.adminRating || null;
-        const ratingText =
-          rating === 'good'
-            ? '👍 dobrá odpoveď'
-            : rating === 'bad'
-            ? '👎 zlá / nepresná odpoveď'
-            : 'zatiaľ nehodnotené';
-
         detailInfo.innerHTML = `
           Session: <b>${escapeHtml(sessionId || '')}</b>
-          <span class="detail-badge">počet krokov: ${allForSession.length}</span>
-          <span class="detail-badge">rating: ${escapeHtml(ratingText)}</span>
-          <div class="rating-bar">
-            <span>Hodnotenie odpovede:</span>
-            <button id="rateGoodBtn">👍 dobrá</button>
-            <button id="rateBadBtn">👎 zlá</button>
-            <span id="ratingStatus" class="rating-status"></span>
-          </div>
-          <div class="rating-note">
-            <label for="ratingNote">Poznámka pre tréning (voliteľné):</label>
-            <textarea id="ratingNote" placeholder="napr. nepochopilo dotaz, chýba info o doprave..."></textarea>
-            <div class="rating-note-actions">
-              <button id="saveRatingBtn">Uložiť hodnotenie</button>
-              <span id="ratingSavedInfo" class="rating-status"></span>
-            </div>
-          </div>
+          <span class="detail-badge">počet krokov: ${
+            allForSession.length
+          }</span>
         `;
-
-        // nastav UI stavu ratingu
-        const rateGoodBtn = document.getElementById('rateGoodBtn');
-        const rateBadBtn = document.getElementById('rateBadBtn');
-        const ratingNoteEl = document.getElementById('ratingNote');
-        const ratingStatus = document.getElementById('ratingStatus');
-        const ratingSavedInfo = document.getElementById('ratingSavedInfo');
-        const saveRatingBtn = document.getElementById('saveRatingBtn');
-
-        if (rating === 'good') {
-          rateGoodBtn.classList.add('selected');
-        } else if (rating === 'bad') {
-          rateBadBtn.classList.add('selected');
-        }
-        if (entry.adminNote) {
-          ratingNoteEl.value = entry.adminNote;
-        }
-
-        function selectRating(newRating) {
-          rateGoodBtn.classList.toggle('selected', newRating === 'good');
-          rateBadBtn.classList.toggle('selected', newRating === 'bad');
-          entry.adminRating = newRating;
-          ratingStatus.textContent =
-            newRating === 'good'
-              ? 'vybrané: 👍 dobrá'
-              : newRating === 'bad'
-              ? 'vybrané: 👎 zlá'
-              : '';
-        }
-
-        rateGoodBtn.onclick = () => selectRating('good');
-        rateBadBtn.onclick = () => selectRating('bad');
-
-        saveRatingBtn.onclick = async () => {
-          const ratingVal = entry.adminRating;
-          const noteVal = ratingNoteEl.value.trim();
-          const key = adminKeyInput.value.trim();
-
-          if (!key) {
-            alert('Zadaj admin key (hore vľavo).');
-            return;
-          }
-          if (!ratingVal) {
-            alert('Vyber najprv rating (👍 alebo 👎).');
-            return;
-          }
-
-          saveRatingBtn.disabled = true;
-          saveRatingBtn.textContent = 'Ukladám...';
-          ratingSavedInfo.textContent = '';
-
-          try {
-            const resp = await fetch('/api/admin/rate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                adminKey: key,
-                sessionId: entry.sessionId,
-                ts: entry.ts,
-                rating: ratingVal,
-                note: noteVal
-              })
-            });
-            if (!resp.ok) {
-              const txt = await resp.text();
-              throw new Error('HTTP ' + resp.status + ': ' + txt);
-            }
-            // úspech – lokálne si uložíme poznámku
-            entry.adminNote = noteVal;
-            ratingSavedInfo.textContent = 'Hodnotenie uložené.';
-          } catch (err) {
-            console.error(err);
-            alert('Chyba pri ukladaní hodnotenia: ' + err.message);
-          } finally {
-            saveRatingBtn.disabled = false;
-            saveRatingBtn.textContent = 'Uložiť hodnotenie';
-          }
-        };
 
         if (!allForSession.length) {
           detailBody.innerHTML =
@@ -644,6 +607,20 @@
             const mode = msg.effectiveMode || msg.modeFromClient || '';
             const isError = !!msg.error;
 
+            const ratingLabel =
+              msg.adminRating === 'good'
+                ? '<span class="mode-pill rating-good">👍 good</span>'
+                : msg.adminRating === 'bad'
+                ? '<span class="mode-pill rating-bad">👎 bad</span>'
+                : '';
+
+            const note =
+              msg.adminNote && msg.adminNote.trim()
+                ? `<div class="rating-note">Poznámka: ${escapeHtml(
+                    msg.adminNote
+                  )}</div>`
+                : '';
+
             const answerHtml = isError
               ? `<div class="error-box"><strong>⚠️ Chyba:</strong><br>${escapeHtml(
                   msg.error
@@ -653,19 +630,58 @@
                   ${msg.answer || '<span class="muted">(bez odpovede)</span>'}
                 </div>`;
 
+            // rating buttons len ak máme odpoveď (nie error)
+            const ratingControls = !isError
+              ? `
+              <div class="rating-buttons">
+                <button
+                  type="button"
+                  class="rating-btn good"
+                  onclick="rateMessage('${escapeHtml(
+                    msg.sessionId || ''
+                  )}','${escapeHtml(msg.ts || '')}','good')"
+                >
+                  👍 good
+                </button>
+                <button
+                  type="button"
+                  class="rating-btn bad"
+                  onclick="rateMessage('${escapeHtml(
+                    msg.sessionId || ''
+                  )}','${escapeHtml(msg.ts || '')}','bad')"
+                >
+                  👎 bad
+                </button>
+                ${ratingLabel}
+                ${note}
+              </div>
+            `
+              : ratingLabel
+              ? `<div class="rating-buttons">${ratingLabel}${note}</div>`
+              : '';
+
+            const ragHits = Array.isArray(msg.ragHits)
+              ? msg.ragHits
+              : Array.isArray(msg.rag_hits)
+              ? msg.rag_hits
+              : [];
+            const ragInfo =
+              ragHits.length > 0
+                ? ` • RAG: ${ragHits.length} hitov`
+                : ' • RAG: 0';
+
             return `
             <div class="message-block">
               <div class="msg-meta">
                 #${idx + 1} • ${formatTs(msg.ts)} • režim: ${
               mode || '-'
-            } • domain: ${msg.domain || '-'} ${
-              isError ? '• <span style="color:#b91c1c;">CHYBA</span>' : ''
-            }
+            } • domain: ${msg.domain || '-'}${ragInfo}
               </div>
               <div class="msg-q">
                 <strong>🧑 Otázka:</strong> ${escapeHtml(msg.question || '')}
               </div>
               ${answerHtml}
+              ${ratingControls}
             </div>
           `;
           })
@@ -679,8 +695,8 @@
 
         currentLogs = allLogs.filter((entry) => {
           if (mode) {
-            const effMode = entry.effectiveMode || entry.modeFromClient || '';
-            if (effMode !== mode) return false;
+            const eff = entry.effectiveMode || entry.modeFromClient || '';
+            if (eff !== mode) return false;
           }
           if (onlyErrors && !entry.error) return false;
 
@@ -700,7 +716,6 @@
           'Klikni na riadok v tabuľke vľavo pre zobrazenie detailu.';
         detailBody.innerHTML =
           '<p class="muted">Žiadna konverzácia nie je vybraná.</p>';
-        currentEntryForDetail = null;
       }
 
       async function loadLogs() {
@@ -731,6 +746,7 @@
             throw new Error('HTTP ' + resp.status + ': ' + txt);
           }
           const data = await resp.json();
+          // očakávame pole logov doplnených o adminRating/adminNote
           allLogs = Array.isArray(data) ? data : [];
 
           applyFilters();
@@ -743,65 +759,111 @@
         }
       }
 
-      function exportCsv() {
+      // C3 – volanie /api/admin/rate z detailu
+      async function rateMessage(sessionId, ts, rating) {
+        const adminKey = adminKeyInput.value.trim();
+        if (!adminKey) {
+          alert('Zadaj admin key (hore vľavo), aby bolo možné uložiť hodnotenie.');
+          return;
+        }
+
+        if (rating !== 'good' && rating !== 'bad') {
+          alert('Neplatný typ hodnotenia.');
+          return;
+        }
+
+        const note = window.prompt('Poznámka k hodnoteniu (voliteľné):', '') || '';
+
+        try {
+          const resp = await fetch('/api/admin/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminKey,
+              sessionId,
+              ts,
+              rating,
+              note
+            })
+          });
+
+          if (!resp.ok) {
+            const txt = await resp.text();
+            throw new Error('HTTP ' + resp.status + ': ' + txt);
+          }
+
+          // po úspešnom hodnotení znovu načítame logy (aby sa adminRating/adminNote doplnili)
+          await loadLogs();
+        } catch (err) {
+          console.error('rate error', err);
+          alert('Chyba pri ukladaní hodnotenia: ' + err.message);
+        }
+      }
+
+      // sprístupníme funkciu pre inline onclick
+      window.rateMessage = rateMessage;
+
+      // C4 – export do CSV (aktuálny filter = currentLogs)
+      function exportCurrentToCsv() {
         if (!currentLogs.length) {
-          alert('Nie sú žiadne logy na export (skontroluj filtre).');
+          alert('Nie je čo exportovať – najprv načítaj logy.');
           return;
         }
 
         const header = [
           'ts',
           'sessionId',
-          'mode',
+          'effectiveMode',
+          'modeFromClient',
           'domain',
           'question',
           'answer',
           'error',
-          'ragHitsCount',
           'adminRating',
-          'adminNote'
+          'adminNote',
+          'ragHitsCount'
         ];
 
-        function csvEscape(value) {
-          const s = String(value ?? '');
-          const escaped = s.replace(/"/g, '""');
-          return `"${escaped}"`;
-        }
-
-        const lines = [];
-        lines.push(header.map(csvEscape).join(','));
-
-        currentLogs.forEach((entry) => {
-          const mode = entry.effectiveMode || entry.modeFromClient || '';
-          const ragCount =
-            Array.isArray(entry.ragHits) && entry.ragHits.length
-              ? entry.ragHits.length
-              : 0;
-
-          const row = [
-            entry.ts || '',
-            entry.sessionId || '',
-            mode || '',
-            entry.domain || '',
-            entry.question || '',
-            entry.answer || '',
-            entry.error || '',
-            ragCount,
-            entry.adminRating || '',
-            entry.adminNote || ''
+        const rows = currentLogs.map((e) => {
+          const ragHits = Array.isArray(e.ragHits)
+            ? e.ragHits
+            : Array.isArray(e.rag_hits)
+            ? e.rag_hits
+            : [];
+          const vals = [
+            e.ts || '',
+            e.sessionId || '',
+            e.effectiveMode || '',
+            e.modeFromClient || '',
+            e.domain || '',
+            (e.question || '').replace(/\s+/g, ' ').trim(),
+            (e.answer || '').replace(/\s+/g, ' ').trim(),
+            (e.error || '').replace(/\s+/g, ' ').trim(),
+            e.adminRating || '',
+            (e.adminNote || '').replace(/\s+/g, ' ').trim(),
+            String(ragHits.length || 0)
           ];
-
-          lines.push(row.map(csvEscape).join(','));
+          return vals
+            .map((v) => {
+              const s = String(v);
+              // jednoduchý CSV escape – ak je čiarka alebo úvodzovky, obalíme do "
+              if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+                return '"' + s.replace(/"/g, '""') + '"';
+              }
+              return s;
+            })
+            .join(',');
         });
 
-        const csv = lines.join('\n');
-        const blob = new Blob([csv], {
-          type: 'text/csv;charset=utf-8;'
-        });
+        const csv = [header.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
+
         const a = document.createElement('a');
         a.href = url;
-        a.download = `carneo-chat-logs-${Date.now()}.csv`;
+        const now = new Date();
+        const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        a.download = `carneo-chatlogs-${stamp}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -809,12 +871,12 @@
       }
 
       loadBtn.addEventListener('click', loadLogs);
+      exportCsvBtn.addEventListener('click', exportCurrentToCsv);
       searchText.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') loadLogs();
       });
       modeFilter.addEventListener('change', applyFilters);
       errorsOnly.addEventListener('change', applyFilters);
-      exportBtn.addEventListener('click', exportCsv);
     </script>
   </body>
 </html>
