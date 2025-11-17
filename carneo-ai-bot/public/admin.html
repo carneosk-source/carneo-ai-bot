@@ -77,7 +77,8 @@
         gap: 4px;
       }
       input,
-      select {
+      select,
+      textarea {
         font: inherit;
         padding: 4px 8px;
         border-radius: 8px;
@@ -85,7 +86,8 @@
         min-width: 0;
       }
       input:focus,
-      select:focus {
+      select:focus,
+      textarea:focus {
         outline: 2px solid #111827;
         outline-offset: 1px;
       }
@@ -97,6 +99,10 @@
         cursor: pointer;
         background: #111827;
         color: #fff;
+      }
+      button.secondary {
+        background: #e5e7eb;
+        color: #111827;
       }
       button:disabled {
         opacity: 0.5;
@@ -156,6 +162,11 @@
       .mode-pill.error-tag {
         background: #fee2e2;
         color: #b91c1c;
+        margin-left: 4px;
+      }
+      .mode-pill.rag-tag {
+        background: #fbbf24;
+        color: #92400e;
         margin-left: 4px;
       }
       .detail-meta {
@@ -218,6 +229,42 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .rating-bar {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        font-size: 13px;
+      }
+      .rating-bar button {
+        padding: 4px 10px;
+        font-size: 14px;
+      }
+      .rating-bar button.selected {
+        box-shadow: 0 0 0 2px #111827;
+      }
+      .rating-note {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .rating-note textarea {
+        width: 100%;
+        min-height: 60px;
+        resize: vertical;
+      }
+      .rating-note-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-start;
+      }
+      .rating-status {
+        font-size: 12px;
+        color: #6b7280;
+      }
       .muted {
         color: #9ca3af;
         font-size: 13px;
@@ -233,6 +280,8 @@
         <span class="badge">order: <span id="orderCount">0</span></span>
         <span class="badge">tech: <span id="techCount">0</span></span>
         <span class="badge errors">chyby: <span id="errorCount">0</span></span>
+        <span class="badge">RAG: <span id="ragCount">0</span></span>
+        <span class="badge">generické: <span id="genericCount">0</span></span>
       </div>
     </header>
 
@@ -282,6 +331,7 @@
             iba chyby
           </label>
           <button id="loadBtn">Načítať logy</button>
+          <button id="exportBtn" class="secondary">Export CSV</button>
         </div>
 
         <div
@@ -307,7 +357,7 @@
         <p class="muted">Klikni na riadok pre detail celej konverzácie.</p>
       </section>
 
-      <!-- PRAVO: detail konverzácie -->
+      <!-- PRAVO: detail konverzácie + rating -->
       <section class="card">
         <h2>Detail konverzácie</h2>
         <div id="detailInfo" class="detail-meta">
@@ -329,6 +379,7 @@
       const limitSelect = document.getElementById('limitSelect');
       const errorsOnly = document.getElementById('errorsOnly');
       const loadBtn = document.getElementById('loadBtn');
+      const exportBtn = document.getElementById('exportBtn');
       const tbody = document.getElementById('logsTbody');
 
       const totalCountSpan = document.getElementById('totalCount');
@@ -336,6 +387,8 @@
       const orderCountSpan = document.getElementById('orderCount');
       const techCountSpan = document.getElementById('techCount');
       const errorCountSpan = document.getElementById('errorCount');
+      const ragCountSpan = document.getElementById('ragCount');
+      const genericCountSpan = document.getElementById('genericCount');
 
       const detailInfo = document.getElementById('detailInfo');
       const detailBody = document.getElementById('detailBody');
@@ -344,6 +397,8 @@
       let allLogs = [];
       // aktuálne zobrazené po filtrovaní
       let currentLogs = [];
+      // záznam, ktorý je aktuálne zobrazený v detaile (kliknutý riadok)
+      let currentEntryForDetail = null;
 
       function escapeHtml(str) {
         return String(str || '')
@@ -364,13 +419,38 @@
         }
       }
 
+      function usesRag(entry) {
+        return Array.isArray(entry.ragHits) && entry.ragHits.length > 0;
+      }
+
+      function isGenericAnswer(entry) {
+        const ans = (entry.answer || '').toLowerCase();
+        if (!ans) return false;
+        const phrases = [
+          'kontaktujte našu podporu',
+          'kontaktujte podporu',
+          'kontaktujte carneo podporu',
+          'napíšte na e-mail',
+          'napiste na e-mail',
+          'napíšte nám na',
+          'napiste nam na',
+          'obráťte sa na carneo podporu',
+          'obratte sa na carneo podporu',
+          'eskalaciu na cloveka',
+          'eskaláciu na človeka'
+        ];
+        return phrases.some((p) => ans.includes(p));
+      }
+
       function computeStats(logs) {
         const stats = {
           total: logs.length,
           product: 0,
           order: 0,
           tech: 0,
-          errors: 0
+          errors: 0,
+          rag: 0,
+          generic: 0
         };
 
         logs.forEach((entry) => {
@@ -378,7 +458,10 @@
           if (mode === 'product') stats.product++;
           else if (mode === 'order') stats.order++;
           else if (mode === 'tech') stats.tech++;
+
           if (entry.error) stats.errors++;
+          if (usesRag(entry)) stats.rag++;
+          if (isGenericAnswer(entry)) stats.generic++;
         });
 
         totalCountSpan.textContent = stats.total;
@@ -386,6 +469,8 @@
         orderCountSpan.textContent = stats.order;
         techCountSpan.textContent = stats.tech;
         errorCountSpan.textContent = stats.errors;
+        ragCountSpan.textContent = stats.rag;
+        genericCountSpan.textContent = stats.generic;
       }
 
       function renderTable(logs) {
@@ -403,6 +488,10 @@
             ? '<span class="mode-pill error-tag">error</span>'
             : '';
 
+          const ragTag = usesRag(entry)
+            ? '<span class="mode-pill rag-tag">rag</span>'
+            : '';
+
           tr.innerHTML = `
             <td>${formatTs(entry.ts)}</td>
             <td>${escapeHtml(entry.sessionId || '')}</td>
@@ -414,6 +503,7 @@
                   ? 'tech'
                   : ''
               }">${mode || '-'}</span>
+              ${ragTag}
               ${hasErrorTag}
             </td>
             <td title="${escapeHtml(entry.question || '')}">
@@ -430,16 +520,118 @@
 
       function showDetail(entry) {
         if (!entry) return;
+        currentEntryForDetail = entry;
 
         const sessionId = entry.sessionId;
         const allForSession = currentLogs
           .filter((e) => e.sessionId === sessionId)
           .sort((a, b) => (a.ts > b.ts ? 1 : -1));
 
+        const rating = entry.adminRating || null;
+        const ratingText =
+          rating === 'good'
+            ? '👍 dobrá odpoveď'
+            : rating === 'bad'
+            ? '👎 zlá / nepresná odpoveď'
+            : 'zatiaľ nehodnotené';
+
         detailInfo.innerHTML = `
           Session: <b>${escapeHtml(sessionId || '')}</b>
           <span class="detail-badge">počet krokov: ${allForSession.length}</span>
+          <span class="detail-badge">rating: ${escapeHtml(ratingText)}</span>
+          <div class="rating-bar">
+            <span>Hodnotenie odpovede:</span>
+            <button id="rateGoodBtn">👍 dobrá</button>
+            <button id="rateBadBtn">👎 zlá</button>
+            <span id="ratingStatus" class="rating-status"></span>
+          </div>
+          <div class="rating-note">
+            <label for="ratingNote">Poznámka pre tréning (voliteľné):</label>
+            <textarea id="ratingNote" placeholder="napr. nepochopilo dotaz, chýba info o doprave..."></textarea>
+            <div class="rating-note-actions">
+              <button id="saveRatingBtn">Uložiť hodnotenie</button>
+              <span id="ratingSavedInfo" class="rating-status"></span>
+            </div>
+          </div>
         `;
+
+        // nastav UI stavu ratingu
+        const rateGoodBtn = document.getElementById('rateGoodBtn');
+        const rateBadBtn = document.getElementById('rateBadBtn');
+        const ratingNoteEl = document.getElementById('ratingNote');
+        const ratingStatus = document.getElementById('ratingStatus');
+        const ratingSavedInfo = document.getElementById('ratingSavedInfo');
+        const saveRatingBtn = document.getElementById('saveRatingBtn');
+
+        if (rating === 'good') {
+          rateGoodBtn.classList.add('selected');
+        } else if (rating === 'bad') {
+          rateBadBtn.classList.add('selected');
+        }
+        if (entry.adminNote) {
+          ratingNoteEl.value = entry.adminNote;
+        }
+
+        function selectRating(newRating) {
+          rateGoodBtn.classList.toggle('selected', newRating === 'good');
+          rateBadBtn.classList.toggle('selected', newRating === 'bad');
+          entry.adminRating = newRating;
+          ratingStatus.textContent =
+            newRating === 'good'
+              ? 'vybrané: 👍 dobrá'
+              : newRating === 'bad'
+              ? 'vybrané: 👎 zlá'
+              : '';
+        }
+
+        rateGoodBtn.onclick = () => selectRating('good');
+        rateBadBtn.onclick = () => selectRating('bad');
+
+        saveRatingBtn.onclick = async () => {
+          const ratingVal = entry.adminRating;
+          const noteVal = ratingNoteEl.value.trim();
+          const key = adminKeyInput.value.trim();
+
+          if (!key) {
+            alert('Zadaj admin key (hore vľavo).');
+            return;
+          }
+          if (!ratingVal) {
+            alert('Vyber najprv rating (👍 alebo 👎).');
+            return;
+          }
+
+          saveRatingBtn.disabled = true;
+          saveRatingBtn.textContent = 'Ukladám...';
+          ratingSavedInfo.textContent = '';
+
+          try {
+            const resp = await fetch('/api/admin/rate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                adminKey: key,
+                sessionId: entry.sessionId,
+                ts: entry.ts,
+                rating: ratingVal,
+                note: noteVal
+              })
+            });
+            if (!resp.ok) {
+              const txt = await resp.text();
+              throw new Error('HTTP ' + resp.status + ': ' + txt);
+            }
+            // úspech – lokálne si uložíme poznámku
+            entry.adminNote = noteVal;
+            ratingSavedInfo.textContent = 'Hodnotenie uložené.';
+          } catch (err) {
+            console.error(err);
+            alert('Chyba pri ukladaní hodnotenia: ' + err.message);
+          } finally {
+            saveRatingBtn.disabled = false;
+            saveRatingBtn.textContent = 'Uložiť hodnotenie';
+          }
+        };
 
         if (!allForSession.length) {
           detailBody.innerHTML =
@@ -508,6 +700,7 @@
           'Klikni na riadok v tabuľke vľavo pre zobrazenie detailu.';
         detailBody.innerHTML =
           '<p class="muted">Žiadna konverzácia nie je vybraná.</p>';
+        currentEntryForDetail = null;
       }
 
       async function loadLogs() {
@@ -522,7 +715,7 @@
 
         try {
           const params = new URLSearchParams();
-          // backend očakáva adminKey/mode/search/limit tak ako doteraz
+          // backend očakáva adminKey/mode/search/limit
           params.set('adminKey', key);
           const mode = modeFilter.value;
           const search = searchText.value.trim();
@@ -550,12 +743,78 @@
         }
       }
 
+      function exportCsv() {
+        if (!currentLogs.length) {
+          alert('Nie sú žiadne logy na export (skontroluj filtre).');
+          return;
+        }
+
+        const header = [
+          'ts',
+          'sessionId',
+          'mode',
+          'domain',
+          'question',
+          'answer',
+          'error',
+          'ragHitsCount',
+          'adminRating',
+          'adminNote'
+        ];
+
+        function csvEscape(value) {
+          const s = String(value ?? '');
+          const escaped = s.replace(/"/g, '""');
+          return `"${escaped}"`;
+        }
+
+        const lines = [];
+        lines.push(header.map(csvEscape).join(','));
+
+        currentLogs.forEach((entry) => {
+          const mode = entry.effectiveMode || entry.modeFromClient || '';
+          const ragCount =
+            Array.isArray(entry.ragHits) && entry.ragHits.length
+              ? entry.ragHits.length
+              : 0;
+
+          const row = [
+            entry.ts || '',
+            entry.sessionId || '',
+            mode || '',
+            entry.domain || '',
+            entry.question || '',
+            entry.answer || '',
+            entry.error || '',
+            ragCount,
+            entry.adminRating || '',
+            entry.adminNote || ''
+          ];
+
+          lines.push(row.map(csvEscape).join(','));
+        });
+
+        const csv = lines.join('\n');
+        const blob = new Blob([csv], {
+          type: 'text/csv;charset=utf-8;'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `carneo-chat-logs-${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
       loadBtn.addEventListener('click', loadLogs);
       searchText.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') loadLogs();
       });
       modeFilter.addEventListener('change', applyFilters);
       errorsOnly.addEventListener('change', applyFilters);
+      exportBtn.addEventListener('click', exportCsv);
     </script>
   </body>
 </html>
