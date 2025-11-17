@@ -469,43 +469,45 @@
       }
 
       function computeStats(logs) {
-        const stats = {
-          total: logs.length,
-          product: 0,
-          order: 0,
-          tech: 0,
-          errors: 0,
-          withRating: 0,
-          ratingGood: 0,
-          ratingBad: 0,
-          withRag: 0,
-          withoutRag: 0,
-          genericAnswers: 0
-        };
+  const stats = {
+    total: logs.length,
+    product: 0,
+    order: 0,
+    tech: 0,
+    errors: 0,
+    withRating: 0,
+    ratingGood: 0,
+    ratingBad: 0,
+    withRag: 0,
+    withoutRag: 0,
+    genericAnswers: 0
+  };
 
-        logs.forEach((entry) => {
-          const mode = entry.effectiveMode || entry.modeFromClient || '';
-          if (mode === 'product') stats.product++;
-          else if (mode === 'order') stats.order++;
-          else if (mode === 'tech') stats.tech++;
+  logs.forEach((entry) => {
+    const mode = entry.effectiveMode || entry.modeFromClient || '';
+    if (mode === 'product') stats.product++;
+    else if (mode === 'order') stats.order++;
+    else if (mode === 'tech') stats.tech++;
 
-          if (entry.error) stats.errors++;
+    if (entry.error) stats.errors++;
 
-          const ragHits = Array.isArray(entry.ragHits)
-            ? entry.ragHits
-            : Array.isArray(entry.rag_hits)
-            ? entry.rag_hits
-            : [];
-          if (ragHits.length > 0) stats.withRag++;
-          else stats.withoutRag++;
+    // RAG štatistiky (podporujeme staré aj nové pole)
+    const ragHits = Array.isArray(entry.ragHits)
+      ? entry.ragHits
+      : Array.isArray(entry.rag_hits)
+      ? entry.rag_hits
+      : [];
+    if (ragHits.length > 0) stats.withRag++;
+    else stats.withoutRag++;
 
-          if (entry.adminRating === 'good') {
-            stats.withRating++;
-            stats.ratingGood++;
-          } else if (entry.adminRating === 'bad') {
-            stats.withRating++;
-            stats.ratingBad++;
-          }
+    // manuálne hodnotenie 👍 / 👎
+    if (entry.adminRating === 'good') {
+      stats.withRating++;
+      stats.ratingGood++;
+    } else if (entry.adminRating === 'bad') {
+      stats.withRating++;
+      stats.ratingBad++;
+    }
 
           // veľmi jednoduchá heuristika "všeobecná odpoveď"
           if (mode === 'product') {
