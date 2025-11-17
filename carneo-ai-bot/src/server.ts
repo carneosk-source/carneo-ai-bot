@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { search } from './rag.js';
 
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -361,6 +362,95 @@ Pokyny:
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// ADMIN – prehľad logov (čítanie + štatistiky, podklad pre admin UI)
+app.get('/api/admin/chat-logs', async (req, res) => {
+  try {
+    const { adminKey, mode, search, limit } = req.query;
+
+    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!fs.existsSync(LOG_FILE)) {
+      return res.json([]);
+    }
+
+    const raw = fs.readFileSync(LOG_FILE, 'utf-8');
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    // Najprv načítame všetko a oddelíme rating eventy od normálnych logov
+    const logs: any[] = [];
+    const ratingMap = new Map<string, { rating: string; note?: string }>();
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+
+        // Rating event (z /api/admin/rate)
+        if (entry.type === 'rating' && entry.sessionId && entry.targetTs) {
+          const key = `${entry.sessionId}|${entry.targetTs}`;
+          ratingMap.set(key, {
+            rating: entry.rating,
+            note: entry.note
+          });
+          continue;
+        }
+
+        // Bežný chat log
+        logs.push(entry);
+      } catch {
+        // ignoruj poškodené riadky
+      }
+    }
+
+    // Doplníme adminRating / adminNote podľa ratingMap
+    logs.forEach((entry) => {
+      if (!entry.sessionId || !entry.ts) return;
+      const key = `${entry.sessionId}|${entry.ts}`;
+      const r = ratingMap.get(key);
+      if (r) {
+        entry.adminRating = r.rating;
+        entry.adminNote = r.note || '';
+      }
+    });
+
+    // Filtrovanie podľa query
+    let out = logs.slice().sort((a, b) =>
+      a.ts > b.ts ? -1 : 1
+    );
+
+    if (mode && typeof mode === 'string') {
+      out = out.filter((e) => {
+        const eff = e.effectiveMode || e.modeFromClient || '';
+        return eff === mode;
+      });
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const s = search.toLowerCase();
+      out = out.filter((e) => {
+        const blob = `${e.question || ''}\n${e.answer || ''}\n${
+          e.error || ''
+        }`.toLowerCase();
+        return blob.includes(s);
+      });
+    }
+
+    const lim =
+      typeof limit === 'string' ? parseInt(limit, 10) || 200 : 200;
+    out = out.slice(0, lim);
+
+    res.json(out);
+  } catch (err) {
+    console.error('admin chat-logs error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ============ ADMIN: PREHĽAD POSLEDNÝCH CHATOV ============
 app.get('/admin/chat-logs', (req, res) => {
   const token = req.query.token as string | undefined;
@@ -601,6 +691,43 @@ app.get('/api/admin/chat-logs', (req, res) => {
     });
   } catch (e) {
     console.error('admin logs error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ADMIN – uloženie manuálneho hodnotenia odpovede (C3)
+app.post('/api/admin/rate', (req, res) => {
+  try {
+    const { adminKey, sessionId, ts, rating, note } = req.body || {};
+
+    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!sessionId || !ts || !rating) {
+      return res.status(400).json({
+        error: 'Missing sessionId / ts / rating'
+      });
+    }
+
+    if (rating !== 'good' && rating !== 'bad') {
+      return res.status(400).json({
+        error: 'rating must be "good" or "bad"'
+      });
+    }
+
+    // zapíšeme do logu samostatnú položku typu "rating"
+    appendChatLog({
+      type: 'rating',
+      sessionId,
+      targetTs: ts, // k čomu sa rating vzťahuje
+      rating,
+      note: note || null
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('admin rate error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
