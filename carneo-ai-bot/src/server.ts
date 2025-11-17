@@ -258,6 +258,42 @@ Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na te
     // product rezim pouziva produktovy index, ostatne general
     const hits = await search(openai, queryForSearch, 6, { domain });
 
+    // HEURISTICKÝ FILTER PODĽA KATEGÓRIÍ (chráni pred miešaním pánske/detské/pes)
+function isKidProduct(name: string = '') {
+  return /guardkid|detské|detske|tiny|ultra/i.test(name);
+}
+function isPetProduct(name: string = '') {
+  return /dogsafe|lokátor|lokator|zvierat/i.test(name);
+}
+function isMenQuery(q: string) {
+  return /pánsk|panske|pansky/i.test(q);
+}
+function isKidsQuery(q: string) {
+  return /detské|detske|pre deti|dieta/i.test(q);
+}
+function isPetQuery(q: string) {
+  return /pes|psa|psovi|psom|zviera/i.test(q);
+}
+
+// aplikácia filtra
+let filteredHits = hits;
+
+if (isMenQuery(question)) {
+  filteredHits = hits.filter(h => !isKidProduct(h.meta?.name) && !isPetProduct(h.meta?.name));
+}
+if (isKidsQuery(question)) {
+  filteredHits = hits.filter(h => isKidProduct(h.meta?.name));
+}
+if (isPetQuery(question)) {
+  filteredHits = hits.filter(h => isPetProduct(h.meta?.name));
+}
+
+// ak sa odfiltruje všetko, nechaj pôvodné
+if (filteredHits.length > 0) {
+  hits.length = 0;
+  hits.push(...filteredHits);
+}
+
     const citations = hits
       .map((h, i) => {
         const meta: any = h.meta || {};
