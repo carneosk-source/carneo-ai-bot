@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { search } from './rag.js';
 import { importSupportEmailsOnce } from './email-import.js';
+import cron from 'node-cron';
 import { importEmailsFromImap } from './imap-client';
 
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -701,6 +702,19 @@ app.post('/api/admin/rate', (req, res) => {
   } catch (err) {
     console.error('admin rate error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ───────────────────────────────
+// CRON JOB – import IMAP emailov raz denne
+// ───────────────────────────────
+// Spustí sa každý deň o 03:00 ráno (server time)
+cron.schedule('0 3 * * *', async () => {
+  console.log("CRON: Spúšťam IMAP import...");
+  try {
+    await importEmailsFromImap();
+  } catch (e) {
+    console.error("CRON IMAP error:", e);
   }
 });
 
