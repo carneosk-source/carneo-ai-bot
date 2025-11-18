@@ -78,6 +78,7 @@ export async function search(openai, query, k = 6, options = {}) {
   }
 
   const embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+  const TECH_FILE = path.join(process.cwd(), 'data', 'rag-tech.jsonl');
 
   const embResp = await openai.embeddings.create({
     model: embeddingModel,
