@@ -16,7 +16,6 @@ import pdfParse from 'pdf-parse';
 const upload = multer({
   dest: path.join(process.cwd(), 'uploads')
 });
-console.log("Adding tech document:", opts.title);
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -119,6 +118,7 @@ async function addTechDocToRag(opts: {
   fileName?: string;
 }) {
   const { title, text, sourceType, fileName } = opts;
+  console.log('Adding tech document:', title, 'source:', sourceType);
 
   const textForEmbedding = `Title: ${title}\nSource: ${sourceType}\n\n${text.slice(0, 5000)}`;
 
