@@ -9,8 +9,6 @@ import { importSupportEmailsOnce } from './email-import.js';
 import cron from 'node-cron';
 import { importEmailsFromImap } from './imap-client';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { simpleParser } from 'mailparser'; // ak už máš
 // import pdf-parse ak chceš parsovať PDF:
 import pdfParse from 'pdf-parse';
