@@ -860,6 +860,36 @@
           return;
         }
 
+        // ADMIN – manuálne spustenie importu support e-mailov do tech knowledge
+app.post('/api/admin/import-support-emails', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const keyFromBody = body.adminKey as string | undefined;
+    const keyFromQuery = req.query.adminKey as string | undefined;
+    const providedKey = keyFromBody || keyFromQuery;
+
+    if (!ADMIN_KEY || providedKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const daysRaw = (body.days ?? req.query.days ?? '1').toString();
+    const days = Math.max(1, parseInt(daysRaw, 10) || 1);
+
+    const result = await importSupportEmails({ days });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+  } catch (err: any) {
+    console.error('import-support-emails error:', err);
+    res.status(500).json({
+      ok: false,
+      error: err?.message || 'Server error'
+    });
+  }
+});
+
         const header = [
           'ts',
           'sessionId',
