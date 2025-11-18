@@ -19,12 +19,16 @@ function appendToTechRag(doc: any) {
   fs.appendFileSync(TECH_RAG_FILE, JSON.stringify(doc) + '\n');
 }
 
+/**
+ * Import posledných "limit" e-mailov z IMAP foldera
+ * (typicky INBOX.Sent) a uloží ich ako tech RAG dokumenty.
+ */
 export async function importEmailsFromImap(limit = 200) {
   const host = process.env.SUPPORT_IMAP_HOST;
   const port = Number(process.env.SUPPORT_IMAP_PORT || 993);
   const user = process.env.SUPPORT_IMAP_USER;
   const pass = process.env.SUPPORT_IMAP_PASS;
-  const folder = process.env.SUPPORT_IMAP_FOLDER || 'SENT';
+  const folder = process.env.SUPPORT_IMAP_FOLDER || 'INBOX.Sent';
 
   if (!host || !user || !pass) {
     console.error('IMAP credentials missing!');
@@ -43,13 +47,20 @@ export async function importEmailsFromImap(limit = 200) {
     await client.connect();
 
     console.log(`IMAP: opening folder ${folder}`);
-    await client.mailboxOpen(folder);
+    const mailbox = await client.mailboxOpen(folder);
 
-    // posledných N správ, odzadu
-    const messages = client.fetch(
-      { limit, reverse: true },
-      { source: true, envelope: true }
-    );
+    const total = mailbox.exists || 0;
+    if (!total) {
+      console.log('IMAP: folder is empty.');
+      return;
+    }
+
+    // vezmeme posledných N správ (napr. 200)
+    const start = Math.max(1, total - limit + 1);
+    const range = `${start}:${total}`;
+    console.log(`IMAP: fetching messages range ${range} (total=${total}, limit=${limit})`);
+
+    const messages = client.fetch(range, { source: true, envelope: true });
 
     for await (const msg of messages) {
       const parsed = await simpleParser(msg.source as any);
