@@ -2,8 +2,15 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
+import { OpenAI } from 'openai';
 
 const TECH_RAG_FILE = path.join(process.cwd(), 'data', 'rag-tech.jsonl');
+const EMBEDDING_MODEL =
+  process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 function appendToTechRag(entry: any) {
   const line = JSON.stringify(entry) + '\n';
@@ -20,7 +27,12 @@ export async function importEmailsFromImap() {
   const folder = process.env.SUPPORT_IMAP_FOLDER || 'SENT';
 
   if (!host || !user || !pass) {
-    console.error("IMAP credentials missing!");
+    console.error('IMAP credentials missing!');
+    return;
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('OPENAI_API_KEY missing – nemôžem počítať embeddingy pre tech e-maily.');
     return;
   }
 
@@ -32,39 +44,69 @@ export async function importEmailsFromImap() {
   });
 
   try {
-    console.log("Connecting to IMAP...");
+    console.log('Connecting to IMAP...');
     await client.connect();
 
     console.log(`Opening folder: ${folder}`);
     await client.mailboxOpen(folder);
 
-    const messages = client.fetch({ limit: 200, reverse: true }, { source: true });
+    // posledných 200 správ zo SENT
+    const messages = client.fetch(
+      { limit: 200, reverse: true },
+      { source: true, envelope: true, internalDate: true }
+    );
 
     for await (const msg of messages) {
       const parsed = await simpleParser(msg.source);
 
       const subject = parsed.subject || '';
-      const body = parsed.text || parsed.html || '';
+      const body = (parsed.text || parsed.html || '').trim();
 
-      // uložíme iba ak je to technická odpoveď
       if (!body) continue;
 
+      // text, ktorý pôjde do embeddingu (skrátime, aby to nebolo obrovské)
+      const textForEmbedding = body.substring(0, 3000);
+
+      // Vypočítame embedding pre tento e-mail
+      let embedding: number[] = [];
+      try {
+        const embResp = await openai.embeddings.create({
+          model: EMBEDDING_MODEL,
+          input: textForEmbedding
+        });
+        embedding = embResp.data[0].embedding;
+      } catch (e) {
+        console.error('Embedding error for email:', subject, e);
+        continue; // tento e-mail vynecháme, aby sme nekazili index
+      }
+
+      // Uložíme do RAG súboru v tvare kompatibilnom so search()
       appendToTechRag({
-        ts: new Date().toISOString(),
-        type: "tech-email",
-        subject,
-        from: parsed.from?.text || '',
-        to: parsed.to?.text || '',
-        text: body.substring(0, 5000),   // limit pre embedding
-        domain: "tech",
-        sourceType: "email"
+        id: `email-${msg.uid || Date.now()}`,
+        text: textForEmbedding,
+        embedding,
+        meta: {
+          subject,
+          from: parsed.from?.text || '',
+          to: parsed.to?.text || '',
+          date:
+            parsed.date instanceof Date
+              ? parsed.date.toISOString()
+              : msg.internalDate?.toISOString?.() || new Date().toISOString(),
+          domain: 'tech',
+          sourceType: 'email'
+        }
       });
     }
 
-    console.log("IMAP import completed.");
+    console.log('IMAP import completed.');
   } catch (err) {
-    console.error("IMAP import error:", err);
+    console.error('IMAP import error:', err);
   } finally {
-    await client.logout();
+    try {
+      await client.logout();
+    } catch {
+      /* ignore */
+    }
   }
 }
