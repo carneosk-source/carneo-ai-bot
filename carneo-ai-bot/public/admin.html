@@ -956,6 +956,66 @@ app.post('/api/admin/import-support-emails', async (req, res) => {
       });
       modeFilter.addEventListener('change', applyFilters);
       errorsOnly.addEventListener('change', applyFilters);
+
+     <!-- ========================================== -->
+<!-- TECH KNOWLEDGE BASE PANEL                  -->
+<!-- ========================================== -->
+
+<hr style="margin:40px 0;">
+
+<h2 style="font-size:22px; margin-bottom:15px;">TECH knowledge base (maily, návody, poznámky)</h2>
+
+<div style="border:1px solid #ccc; padding:20px; border-radius:10px; max-width:900px; background:#fafafa;">
+
+  <div style="margin-bottom:15px; font-weight:600;">Dostupné akcie:</div>
+
+  <button id="btnTechInfo" style="padding:8px 16px; margin-right:10px;">Zobraziť stav databázy</button>
+  <button id="btnTechImport" style="padding:8px 16px; margin-right:10px;">Spustiť IMAP import (SENT maily)</button>
+  <button id="btnTechDownload" style="padding:8px 16px;">Stiahnuť rag-tech.jsonl</button>
+
+  <pre id="techInfoBox" style="
+      background:#fff;
+      padding:12px;
+      margin-top:20px;
+      max-height:300px;
+      overflow:auto;
+      border:1px solid #ddd;
+      border-radius:8px;
+  ">(výsledok sa zobrazí tu)</pre>
+
+</div>
+
+<script>
+(function(){
+  const urlParams = new URLSearchParams(window.location.search);
+  const adminKey = urlParams.get('key') || '';
+
+  const infoBtn = document.getElementById('btnTechInfo');
+  const importBtn = document.getElementById('btnTechImport');
+  const downloadBtn = document.getElementById('btnTechDownload');
+  const box = document.getElementById('techInfoBox');
+
+  function msg(text){ box.textContent = text; }
+
+  infoBtn.addEventListener('click', async () => {
+    msg("Načítavam údaje...");
+    const res = await fetch(`/api/admin/rag-tech-info?key=${adminKey}`);
+    msg(JSON.stringify(await res.json(), null, 2));
+  });
+
+  importBtn.addEventListener('click', async () => {
+    if (!confirm("Naozaj spustiť IMAP import zo SENT priečinka?")) return;
+    msg("Spúšťam import...");
+    const res = await fetch(`/api/admin/import-emails?key=${adminKey}`);
+    msg(JSON.stringify(await res.json(), null, 2));
+  });
+
+  downloadBtn.addEventListener("click", () => {
+    const url = `/api/admin/rag-tech-download?key=${adminKey}`;
+    window.open(url, "_blank");
+  });
+
+})();  
     </script>
   </body>
 </html>
