@@ -412,10 +412,10 @@ Pokyny:
 // ADMIN – prehľad logov (čítanie + štatistiky, podklad pre admin UI)
 app.get('/api/admin/chat-logs', async (req, res) => {
   try {
-    const { adminKey, mode, search, limit } = req.query;
-    const key = String(adminKey || '');
+    const { mode, search, limit } = req.query;
+    const key = String(req.query.adminKey || '');
 
-    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
+    if (!ADMIN_KEY || key !== ADMIN_KEY) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
