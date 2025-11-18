@@ -683,6 +683,25 @@ app.get('/api/admin/rag-tech-download', requireAdminKey, (req, res) => {
   }
 });
 
+app.get("/api/admin/rag-tech-download", (req, res) => {
+  const key = req.query.key;
+
+  if (!key || key !== ADMIN_KEY) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const filePath = path.join(process.cwd(), "data", "rag-tech.jsonl");
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "rag-tech.jsonl not found" });
+  }
+
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Disposition", "attachment; filename=rag-tech.jsonl");
+
+  fs.createReadStream(filePath).pipe(res);
+});
+
 app.get('/api/admin/import-emails', async (req, res) => {
   const key =
     String(req.query.adminKey || req.query.key || req.body?.adminKey || req.body?.key || '');
