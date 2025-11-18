@@ -5,6 +5,7 @@ import { OpenAI } from 'openai';
 import fs from 'fs';
 import path from 'path';
 import { search } from './rag.js';
+import { importSupportEmails } from './support-email-import';
 
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
