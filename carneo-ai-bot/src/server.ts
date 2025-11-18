@@ -8,6 +8,16 @@ import { search } from './rag.js';
 import { importSupportEmailsOnce } from './email-import.js';
 import cron from 'node-cron';
 import { importEmailsFromImap } from './imap-client';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { simpleParser } from 'mailparser'; // ak už máš
+// import pdf-parse ak chceš parsovať PDF:
+import pdfParse from 'pdf-parse';
+
+const upload = multer({
+  dest: path.join(process.cwd(), 'uploads')
+});
 
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
@@ -74,6 +84,137 @@ function appendChatLog(entry: any) {
     console.error('Chat log serialize error:', err);
   }
 }
+
+async function extractTextFromFile(filePath: string, originalName: string): Promise<string> {
+  const buf = fs.readFileSync(filePath);
+  const lower = originalName.toLowerCase();
+
+  if (lower.endsWith('.pdf')) {
+    const pdfData = await pdfParse(buf);
+    return pdfData.text || '';
+  }
+
+  // jednoduchá podpora .txt
+  if (lower.endsWith('.txt')) {
+    return buf.toString('utf8');
+  }
+
+  // fallback – tiež ako text
+  return buf.toString('utf8');
+}
+
+async function addTechDocToRag(opts: {
+  title: string;
+  text: string;
+  sourceType: 'manual' | 'tech-note';
+  fileName?: string;
+}) {
+  const { title, text, sourceType, fileName } = opts;
+
+  const textForEmbedding = `Title: ${title}\nSource: ${sourceType}\n\n${text.slice(0, 5000)}`;
+
+  const embResp = await openai.embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: textForEmbedding
+  });
+
+  const embedding = embResp.data[0].embedding;
+
+  const doc = {
+    id: `tech-${sourceType}-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`,
+    text: textForEmbedding,
+    embedding,
+    meta: {
+      sourceType,
+      domain: 'tech',
+      title,
+      fileName: fileName || null,
+      createdAt: new Date().toISOString()
+    }
+  };
+
+  appendToTechRag(doc);
+}
+app.post(
+  '/api/admin/rag-tech-upload-manuals',
+  upload.array('files', 20),
+  async (req, res) => {
+    try {
+      const keyFromBody = (req.body && req.body.adminKey) as string | undefined;
+      const keyFromQuery = req.query.adminKey as string | undefined;
+      const providedKey = keyFromBody || keyFromQuery;
+
+      if (!ADMIN_KEY || providedKey !== ADMIN_KEY) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const files = (req.files || []) as Express.Multer.File[];
+      if (!files.length) {
+        return res.status(400).json({ error: 'No files uploaded' });
+      }
+
+      const results: any[] = [];
+
+      for (const f of files) {
+        const text = await extractTextFromFile(f.path, f.originalname);
+        if (!text.trim()) {
+          results.push({ file: f.originalname, ok: false, reason: 'empty-text' });
+          continue;
+        }
+
+        await addTechDocToRag({
+          title: f.originalname,
+          text,
+          sourceType: 'manual',
+          fileName: f.originalname
+        });
+
+        results.push({ file: f.originalname, ok: true });
+        // po spracovaní môžeš dočasný súbor zmazať
+        fs.unlink(f.path, () => {});
+      }
+
+      res.json({ ok: true, files: results });
+    } catch (err: any) {
+      console.error('rag-tech-upload-manuals error:', err);
+      res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+    }
+  }
+);
+
+app.post('/api/admin/rag-tech-add-note', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const keyFromBody = body.adminKey as string | undefined;
+    const keyFromQuery = req.query.adminKey as string | undefined;
+    const providedKey = keyFromBody || keyFromQuery;
+
+    if (!ADMIN_KEY || providedKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const title = (body.title || '').toString().trim() || 'Poznámka technika';
+    const text = (body.text || '').toString();
+
+    if (!text.trim()) {
+      return res.status(400).json({ error: 'Empty text' });
+    }
+
+    await addTechDocToRag({
+      title,
+      text,
+      sourceType: 'tech-note'
+    });
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('rag-tech-add-note error:', err);
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
 
 app.post('/api/ask', async (req, res) => {
   try {
