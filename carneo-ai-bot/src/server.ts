@@ -628,7 +628,7 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
   }
 });
 
-app.post('/api/admin/import-emails', async (req, res) => {
+app.get('/api/admin/import-emails', async (req, res) => {
   const key =
     String(req.query.adminKey || req.query.key || req.body?.adminKey || req.body?.key || '');
 
