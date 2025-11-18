@@ -1045,47 +1045,112 @@
 </div>
 
     <script>
-      (function () {
-        const urlParams = new URLSearchParams(window.location.search);
-        const adminKey = urlParams.get('key') || '';
+  (function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminKey = urlParams.get('key') || '';
 
-        const infoBtn = document.getElementById('btnTechInfo');
-        const importBtn = document.getElementById('btnTechImport');
-        const downloadBtn = document.getElementById('btnTechDownload');
-        const box = document.getElementById('techInfoBox');
+    const infoBtn = document.getElementById('btnTechInfo');
+    const importBtn = document.getElementById('btnTechImport');
+    const downloadBtn = document.getElementById('btnTechDownload');
+    const box = document.getElementById('techInfoBox');
 
-        function msg(text) {
-          box.textContent = text;
+    const formManuals = document.getElementById('formTechManuals');
+    const inputManuals = document.getElementById('inputTechManuals');
+
+    const inputNoteTitle = document.getElementById('inputTechNoteTitle');
+    const inputNoteText = document.getElementById('inputTechNoteText');
+    const btnSaveNote = document.getElementById('btnSaveTechNote');
+
+    function msg(text) {
+      box.textContent = text;
+    }
+
+    // Stav databázy
+    infoBtn.addEventListener('click', async () => {
+      msg('Načítavam údaje...');
+      try {
+        const res = await fetch(`/api/admin/rag-tech-info?key=${adminKey}`);
+        const json = await res.json();
+        msg(JSON.stringify(json, null, 2));
+      } catch (e) {
+        msg('Chyba pri načítaní info: ' + e);
+      }
+    });
+
+    // IMAP import
+    importBtn.addEventListener('click', async () => {
+      if (!confirm('Naozaj spustiť IMAP import zo SENT priečinka?')) return;
+      msg('Spúšťam import...');
+      try {
+        const res = await fetch(`/api/admin/import-emails?key=${adminKey}`);
+        const json = await res.json();
+        msg(JSON.stringify(json, null, 2));
+      } catch (e) {
+        msg('Chyba pri importe: ' + e);
+      }
+    });
+
+    // Download JSONL
+    downloadBtn.addEventListener('click', () => {
+      const url = `/api/admin/rag-tech-download?key=${adminKey}`;
+      window.open(url, '_blank');
+    });
+
+    // UPLOAD MANUÁLOV (PDF/TXT)
+    formManuals.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const files = inputManuals.files;
+      if (!files || !files.length) {
+        alert('Vyber aspoň jeden súbor.');
+        return;
+      }
+      msg('Nahrávam súbory...');
+      try {
+        const fd = new FormData();
+        fd.append('adminKey', adminKey);
+        for (const f of files) {
+          fd.append('files', f);
         }
-
-        infoBtn.addEventListener('click', async () => {
-          msg('Načítavam údaje...');
-          try {
-            const res = await fetch(`/api/admin/rag-tech-info?key=${adminKey}`);
-            const json = await res.json();
-            msg(JSON.stringify(json, null, 2));
-          } catch (e) {
-            msg('Chyba pri načítaní info: ' + e);
-          }
+        const res = await fetch('/api/admin/rag-tech-upload-manuals', {
+          method: 'POST',
+          body: fd
         });
+        const json = await res.json();
+        msg(JSON.stringify(json, null, 2));
+      } catch (err) {
+        msg('Chyba pri uploade: ' + err);
+      }
+    });
 
-        importBtn.addEventListener('click', async () => {
-          if (!confirm('Naozaj spustiť IMAP import zo SENT priečinka?')) return;
-          msg('Spúšťam import...');
-          try {
-            const res = await fetch(`/api/admin/import-emails?key=${adminKey}`);
-            const json = await res.json();
-            msg(JSON.stringify(json, null, 2));
-          } catch (e) {
-            msg('Chyba pri importe: ' + e);
-          }
+    // TEXTOVÁ POZNÁMKA TECHNIKA
+    btnSaveNote.addEventListener('click', async () => {
+      const title = (inputNoteTitle.value || '').trim();
+      const text = (inputNoteText.value || '').trim();
+      if (!text) {
+        alert('Text poznámky nesmie byť prázdny.');
+        return;
+      }
+      msg('Ukladám poznámku...');
+      try {
+        const res = await fetch('/api/admin/rag-tech-add-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminKey,
+            title,
+            text
+          })
         });
-
-        downloadBtn.addEventListener('click', () => {
-          const url = `/api/admin/rag-tech-download?key=${adminKey}`;
-          window.open(url, '_blank');
-        });
-      })();
-    </script>
+        const json = await res.json();
+        msg(JSON.stringify(json, null, 2));
+        if (json.ok) {
+          inputNoteText.value = '';
+        }
+      } catch (err) {
+        msg('Chyba pri ukladaní poznámky: ' + err);
+      }
+    });
+  })();
+</script>
   </body>
 </html>
