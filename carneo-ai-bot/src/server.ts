@@ -629,6 +629,37 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
   }
 });
 
+// ADMIN – info o tech RAG súbore (emaily)
+app.get('/api/admin/rag-tech-info', requireAdminKey, (req, res) => {
+  try {
+    if (!fs.existsSync(TECH_RAG_FILE)) {
+      return res.json({
+        exists: false,
+        sizeBytes: 0,
+        records: 0
+      });
+    }
+
+    const stat = fs.statSync(TECH_RAG_FILE);
+    const raw = fs.readFileSync(TECH_RAG_FILE, 'utf-8');
+
+    const records = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean).length;
+
+    res.json({
+      exists: true,
+      sizeBytes: stat.size,
+      records
+    });
+  } catch (err) {
+    console.error('rag-tech-info error:', err);
+    res.status(500).json({ error: 'Cannot read rag-tech file' });
+  }
+});
+
+
 app.get('/api/admin/import-emails', async (req, res) => {
   const key =
     String(req.query.adminKey || req.query.key || req.body?.adminKey || req.body?.key || '');
