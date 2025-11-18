@@ -940,26 +940,109 @@
     <hr style="margin:40px 24px 0; border:none; border-top:1px solid #e5e7eb;">
 
     <div style="padding:16px 24px 40px;">
-      <h2 style="font-size:22px; margin:15px 0;">TECH knowledge base (maily, návody, poznámky)</h2>
+  <h2 style="font-size:22px; margin:15px 0;">
+    TECH knowledge base (maily, návody, poznámky)
+  </h2>
 
-      <div style="border:1px solid #ccc; padding:20px; border-radius:10px; max-width:900px; background:#fafafa;">
-        <div style="margin-bottom:15px; font-weight:600;">Dostupné akcie:</div>
+  <div
+    style="
+      border:1px solid #ccc;
+      padding:20px;
+      border-radius:10px;
+      max-width:900px;
+      background:#fafafa;
+    "
+  >
+    <div style="margin-bottom:15px; font-weight:600;">Dostupné akcie:</div>
 
-        <button id="btnTechInfo" style="padding:8px 16px; margin-right:10px;">Zobraziť stav databázy</button>
-        <button id="btnTechImport" style="padding:8px 16px; margin-right:10px;">Spustiť IMAP import (SENT maily)</button>
-        <button id="btnTechDownload" style="padding:8px 16px;">Stiahnuť rag-tech.jsonl</button>
+    <div style="margin-bottom:12px;">
+      <button id="btnTechInfo" style="padding:8px 16px; margin-right:10px;">
+        Zobraziť stav databázy
+      </button>
+      <button id="btnTechImport" style="padding:8px 16px; margin-right:10px;">
+        Spustiť IMAP import (SENT maily)
+      </button>
+      <button id="btnTechDownload" style="padding:8px 16px;">
+        Stiahnuť rag-tech.jsonl
+      </button>
+    </div>
 
-        <pre id="techInfoBox" style="
-          background:#fff;
-          padding:12px;
-          margin-top:20px;
-          max-height:300px;
-          overflow:auto;
-          border:1px solid #ddd;
-          border-radius:8px;
-        ">(výsledok sa zobrazí tu)</pre>
+    <hr style="margin:16px 0; border:none; border-top:1px dashed #ddd;" />
+
+    <!-- UPLOAD NÁVODOV (PDF/TXT) -->
+    <div style="margin-bottom:18px;">
+      <div style="font-weight:600; margin-bottom:6px;">
+        Upload manuálov (PDF / TXT)
+      </div>
+      <form id="formTechManuals">
+        <input
+          id="inputTechManuals"
+          type="file"
+          multiple
+          accept=".pdf,.txt"
+          style="margin-bottom:8px;"
+        />
+        <br />
+        <button type="submit" style="padding:6px 14px;">
+          Nahrať a pridať do databázy
+        </button>
+      </form>
+      <div style="font-size:12px; color:#6b7280; margin-top:4px;">
+        Súbory sa uložia do rovnakej RAG databázy ako maily. Každý súbor sa
+        rozparsuje a uloží ako technický dokument.
       </div>
     </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px dashed #ddd;" />
+
+    <!-- TEXTOVÁ POZNÁMKA TECHNIKA -->
+    <div style="margin-bottom:18px;">
+      <div style="font-weight:600; margin-bottom:6px;">
+        Nová technická poznámka
+      </div>
+      <div style="margin-bottom:6px;">
+        <input
+          id="inputTechNoteTitle"
+          type="text"
+          placeholder="Názov / krátky popis (napr. 'Guardkid – typická chyba GPS')"
+          style="width:100%; max-width:100%; padding:6px 8px; border-radius:8px; border:1px solid #d1d5db;"
+        />
+      </div>
+      <div>
+        <textarea
+          id="inputTechNoteText"
+          placeholder="Detailný návod, postup krok za krokom, interné poznámky technika..."
+          rows="5"
+          style="width:100%; max-width:100%; padding:6px 8px; border-radius:8px; border:1px solid #d1d5db; font-family:inherit; font-size:14px;"
+        ></textarea>
+      </div>
+      <button
+        id="btnSaveTechNote"
+        type="button"
+        style="margin-top:8px; padding:6px 14px;"
+      >
+        Uložiť poznámku do databázy
+      </button>
+      <div style="font-size:12px; color:#6b7280; margin-top:4px;">
+        Poznámka sa uloží ako samostatný technický dokument. Na odpovede
+        sa bude používať rovnako ako maily a manuály (expert štýl).
+      </div>
+    </div>
+
+    <pre
+      id="techInfoBox"
+      style="
+        background:#fff;
+        padding:12px;
+        margin-top:20px;
+        max-height:300px;
+        overflow:auto;
+        border:1px solid #ddd;
+        border-radius:8px;
+      "
+    >(výsledok sa zobrazí tu)</pre>
+  </div>
+</div>
 
     <script>
       (function () {
