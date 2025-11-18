@@ -629,9 +629,10 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
 });
 
 app.post('/api/admin/import-emails', async (req, res) => {
-  const key = req.query.key || req.body.key;
+  const key =
+    String(req.query.adminKey || req.query.key || req.body?.adminKey || req.body?.key || '');
 
-  if (key !== process.env.ADMIN_KEY) {
+  if (!ADMIN_KEY || key !== ADMIN_KEY) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
