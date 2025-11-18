@@ -6,7 +6,7 @@ let generalIndex: any[] | null = null;
 let productIndex: any[] | null = null;
 let techIndex: any[] | null = null;
 
-function loadIndexOnce(fileName: string) {
+function loadIndexOnce(fileName: string): any[] {
   try {
     const filePath = path.join(process.cwd(), 'data', fileName);
     if (!fs.existsSync(filePath)) {
@@ -26,32 +26,70 @@ function loadIndexOnce(fileName: string) {
   }
 }
 
-function getGeneralIndex() {
+// JSONL loader (pre e-maily: rag-tech.jsonl)
+function loadJsonlIndexOnce(fileName: string): any[] {
+  try {
+    const filePath = path.join(process.cwd(), 'data', fileName);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`⚠ RAG JSONL file not found: ${filePath}`);
+      return [];
+    }
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const out: any[] = [];
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        // očakávame: { id, text, embedding, meta }
+        if (obj && obj.embedding && obj.text) {
+          out.push(obj);
+        }
+      } catch (e) {
+        console.warn('⚠ Cannot parse JSONL line in', fileName, e);
+      }
+    }
+    return out;
+  } catch (e) {
+    console.error('Error loading RAG JSONL index', fileName, e);
+    return [];
+  }
+}
+
+function getGeneralIndex(): any[] {
   if (!generalIndex) {
     // pôvodný index z ingestu (návody, manuály, atď.)
     generalIndex = loadIndexOnce('index.json');
   }
-  return generalIndex;
+  return generalIndex || [];
 }
 
-function getProductIndex() {
+function getProductIndex(): any[] {
   if (!productIndex) {
     // nový index s produktmi z Heureka feedu
     productIndex = loadIndexOnce('carneo-products-index.json');
   }
-  return productIndex;
+  return productIndex || [];
 }
 
-// TECH index – technické e-maily / poznámky / manuály pre doménu "tech"
-function getTechIndex() {
+function getTechIndex(): any[] {
   if (!techIndex) {
-    // očakávame JSON súbor s embeddingami, napr. výstup z indexovacieho skriptu
-    techIndex = loadIndexOnce('rag-tech-index.json');
+    // manuály (index.json) + tech e-maily (rag-tech.jsonl)
+    const manuals = getGeneralIndex();
+    const emails = loadJsonlIndexOnce('rag-tech.jsonl');
+
+    techIndex = [...manuals, ...emails];
+    console.log(
+      `Tech index loaded: manuals=${manuals.length}, emails=${emails.length}, total=${techIndex.length}`
+    );
   }
-  return techIndex;
+  return techIndex || [];
 }
 
-function cosineSimilarity(a: number[], b: number[]) {
+function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
@@ -74,11 +112,10 @@ function cosineSimilarity(a: number[], b: number[]) {
  * @param {{ domain?: 'general' | 'products' | 'tech' }} options
  * @returns {Promise<Array<{id: string, text: string, meta: any, score: number}>>}
  */
-export async function search(openai: any, query: string, k = 6, options: { domain?: 'general' | 'products' | 'tech' } = {}) {
+export async function search(openai: any, query: string, k = 6, options: any = {}) {
   const domain = options.domain || 'general';
 
-  let index: any[];
-
+  let index: any[] = [];
   if (domain === 'products') {
     index = getProductIndex();
   } else if (domain === 'tech') {
@@ -92,7 +129,8 @@ export async function search(openai: any, query: string, k = 6, options: { domai
     return [];
   }
 
-  const embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+  const embeddingModel =
+    process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
 
   const embResp = await openai.embeddings.create({
     model: embeddingModel,
@@ -102,11 +140,11 @@ export async function search(openai: any, query: string, k = 6, options: { domai
   const queryVector = embResp.data[0].embedding as number[];
 
   const scored = index
-    .map((doc: any) => ({
+    .map((doc) => ({
       ...doc,
       score: cosineSimilarity(queryVector, doc.embedding)
     }))
-    .sort((a: any, b: any) => b.score - a.score)
+    .sort((a, b) => b.score - a.score)
     .slice(0, k);
 
   return scored;
