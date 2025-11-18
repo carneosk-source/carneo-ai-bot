@@ -20,6 +20,7 @@ app.get('/', (_req, res) => {
   res.send('Carneo AI Bot API is running.');
 });
 
+const TECH_RAG_FILE = path.join(process.cwd(), 'data', 'rag-tech.jsonl');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 
