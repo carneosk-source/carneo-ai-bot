@@ -659,6 +659,29 @@ app.get('/api/admin/rag-tech-info', requireAdminKey, (req, res) => {
   }
 });
 
+// ADMIN – stiahnutie tech RAG súboru (emaily)
+app.get('/api/admin/rag-tech-download', requireAdminKey, (req, res) => {
+  try {
+    if (!fs.existsSync(TECH_RAG_FILE)) {
+      return res.status(404).json({ error: 'rag-tech file not found' });
+    }
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename="rag-tech.jsonl"');
+
+    const stream = fs.createReadStream(TECH_RAG_FILE);
+    stream.on('error', (err) => {
+      console.error('rag-tech-download stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).end('Read error');
+      }
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('rag-tech-download error:', err);
+    res.status(500).json({ error: 'Cannot stream rag-tech file' });
+  }
+});
 
 app.get('/api/admin/import-emails', async (req, res) => {
   const key =
