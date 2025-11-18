@@ -16,6 +16,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "fast-xml-parser": "^4.5.0"
+    "imapflow": "^1.0.0",
+    "mailparser": "^3.6.5"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
