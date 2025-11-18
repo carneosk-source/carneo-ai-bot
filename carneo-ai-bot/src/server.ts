@@ -16,6 +16,7 @@ import pdfParse from 'pdf-parse';
 const upload = multer({
   dest: path.join(process.cwd(), 'uploads')
 });
+console.log("Adding tech document:", opts.title);
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
