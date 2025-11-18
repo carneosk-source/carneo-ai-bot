@@ -626,7 +626,28 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
   }
 });
 
+// ADMIN – manuálny import support e-mailov do tech knowledge base
+app.post('/api/admin/import-support-emails', async (req, res) => {
+  try {
+    const { adminKey, limit } = req.body || {};
 
+    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const max = typeof limit === 'number' && limit > 0 && limit <= 500 ? limit : 50;
+    const result = await importSupportEmailsOnce(max);
+
+    res.json({
+      ok: true,
+      imported: result.imported,
+      file: 'data/support-emails.jsonl'
+    });
+  } catch (err: any) {
+    console.error('support email import error:', err);
+    res.status(500).json({ error: 'Server error', detail: String(err?.message || err) });
+  }
+});
 
 
 // ADMIN – uloženie manuálneho hodnotenia odpovede (C3)
