@@ -2,10 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 // Cache indexov v pamäti
-let generalIndex = null;
-let productIndex = null;
+let generalIndex: any[] | null = null;
+let productIndex: any[] | null = null;
+let techIndex: any[] | null = null;
 
-function loadIndexOnce(fileName) {
+function loadIndexOnce(fileName: string) {
   try {
     const filePath = path.join(process.cwd(), 'data', fileName);
     if (!fs.existsSync(filePath)) {
@@ -41,7 +42,16 @@ function getProductIndex() {
   return productIndex;
 }
 
-function cosineSimilarity(a, b) {
+// TECH index – technické e-maily / poznámky / manuály pre doménu "tech"
+function getTechIndex() {
+  if (!techIndex) {
+    // očakávame JSON súbor s embeddingami, napr. výstup z indexovacieho skriptu
+    techIndex = loadIndexOnce('rag-tech-index.json');
+  }
+  return techIndex;
+}
+
+function cosineSimilarity(a: number[], b: number[]) {
   let dot = 0;
   let na = 0;
   let nb = 0;
@@ -61,16 +71,21 @@ function cosineSimilarity(a, b) {
  * @param {OpenAI} openai - inštancia OpenAI klienta
  * @param {string} query - otázka
  * @param {number} k - počet výsledkov
- * @param {{ domain?: 'general' | 'products' }} options
+ * @param {{ domain?: 'general' | 'products' | 'tech' }} options
  * @returns {Promise<Array<{id: string, text: string, meta: any, score: number}>>}
  */
-export async function search(openai, query, k = 6, options = {}) {
+export async function search(openai: any, query: string, k = 6, options: { domain?: 'general' | 'products' | 'tech' } = {}) {
   const domain = options.domain || 'general';
 
-  const index =
-    domain === 'products'
-      ? getProductIndex()
-      : getGeneralIndex();
+  let index: any[];
+
+  if (domain === 'products') {
+    index = getProductIndex();
+  } else if (domain === 'tech') {
+    index = getTechIndex();
+  } else {
+    index = getGeneralIndex();
+  }
 
   if (!index || index.length === 0) {
     console.warn(`⚠ RAG index for domain "${domain}" is empty.`);
@@ -78,21 +93,20 @@ export async function search(openai, query, k = 6, options = {}) {
   }
 
   const embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
-  const TECH_FILE = path.join(process.cwd(), 'data', 'rag-tech.jsonl');
 
   const embResp = await openai.embeddings.create({
     model: embeddingModel,
     input: query
   });
 
-  const queryVector = embResp.data[0].embedding;
+  const queryVector = embResp.data[0].embedding as number[];
 
   const scored = index
-    .map((doc) => ({
+    .map((doc: any) => ({
       ...doc,
       score: cosineSimilarity(queryVector, doc.embedding)
     }))
-    .sort((a, b) => b.score - a.score)
+    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, k);
 
   return scored;
