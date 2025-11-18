@@ -19,6 +19,7 @@ const upload = multer({
   dest: path.join(process.cwd(), 'uploads')
 });
 
+const EMBEDDING_MODEL = 'text-embedding-3-large';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
 app.use(cors());
@@ -60,6 +61,15 @@ function readChatLogs(): any[] {
     console.error('Cannot read chat logs:', e);
     return [];
   }
+}
+function appendToTechRag(doc: any) {
+  const dir = path.dirname(TECH_RAG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const line = JSON.stringify(doc) + '\n';
+  fs.appendFileSync(TECH_RAG_FILE, line, 'utf8');
 }
 
 function appendChatLog(entry: any) {
