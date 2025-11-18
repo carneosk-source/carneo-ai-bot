@@ -414,6 +414,11 @@
 
         <script>
       const adminKeyInput = document.getElementById('adminKey');
+      const urlParamsForAdmin = new URLSearchParams(window.location.search);
+      const adminKeyFromUrl = urlParamsForAdmin.get('key') || '';
+      if (adminKeyFromUrl) {
+      adminKeyInput.value = adminKeyFromUrl;
+    }
       const modeFilter = document.getElementById('modeFilter');
       const searchText = document.getElementById('searchText');
       const limitSelect = document.getElementById('limitSelect');
