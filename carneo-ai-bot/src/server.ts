@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { search } from './rag.js';
 import { importSupportEmailsOnce } from './email-import.js';
+import { importEmailsFromImap } from './imap-client';
 
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
