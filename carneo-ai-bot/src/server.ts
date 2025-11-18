@@ -241,8 +241,8 @@ Ak chyba informacia o konkretnom cisle objednavky alebo osobnych udajoch, vysvet
         systemExtra = `
 Zameraj sa na technicke dotazy k produktom Carneo – parovanie hodiniek, aplikacia, kompatibilita s telefonom, baterka, aktualizacie a podobne.
 Ak problem vyzera vazne alebo sa neda jednoducho vyriesit, navrhni kontakt na technicku podporu (Carneo servis).`;
-        searchHint = 'Tema: technicke dotazy a navody k produktom Carneo.';
-        domain = 'general';
+        searchHint = 'Technické dotazy, návody, e-maily zo servisu.';
+        domain = 'tech';   // ⚠️ kľúčová zmena
         break;
 
       default:
