@@ -193,7 +193,7 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
 
     let systemExtra = '';
     let searchHint = '';
-    let domain: 'general' | 'products' = 'general';
+    let domain: 'general' | 'products' | 'tech' = 'general';
 
     switch (effectiveMode) {
       case 'product':
