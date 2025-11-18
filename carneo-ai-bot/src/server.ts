@@ -627,6 +627,22 @@ app.get('/api/admin/stats', requireAdminKey, (req, res) => {
   }
 });
 
+app.post('/api/admin/import-emails', async (req, res) => {
+  const key = req.query.key || req.body.key;
+
+  if (key !== process.env.ADMIN_KEY) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    await importEmailsFromImap();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Import failed' });
+  }
+});
+
 // ADMIN – manuálny import support e-mailov do tech knowledge base
 app.post('/api/admin/import-support-emails', async (req, res) => {
   try {
