@@ -441,33 +441,111 @@ Formát:
         break;
     }
 
+        // ------------------------------------------------
+    // CONTEXT / CONTINUATION – doplňujúce otázky
+    // ------------------------------------------------
+    const CONTINUATION_PHRASES = [
+      'aj v inej farbe',
+      'v inej farbe',
+      'je dostupny aj',
+      'je dostupný aj',
+      'je aj v',
+      'existuje aj v',
+      'existuje aj verzia',
+      'je aj verzia',
+      'aj v čiernej',
+      'aj v ciernej',
+      'aj v bielej',
+      'a ake farby',
+      'aké farby',
+      'v akej farbe',
+      'v akej farbe je',
+      'má aj iné farby',
+      'ma aj ine farby',
+      'ďalšia farba',
+      'dalsia farba',
+      'aj iná farba',
+      'aj ina farba',
+      'aj v inej veľkosti',
+      'aj v inej velkosti',
+      'existujú aj iné farby',
+      'existuju aj ine farby'
+    ];
 
-      // =========================
+    function isContinuationQuestion(q: string): boolean {
+      const x = q.toLowerCase();
+      return CONTINUATION_PHRASES.some(p => x.includes(p));
+    }
+
+    // načítaj posledný log pre daný sessionId (ak existuje)
+    let lastSessionLog: any | null = null;
+    try {
+      const allLogs = readChatLogs();
+      const forSession = allLogs.filter(l => l.sessionId === sid);
+      if (forSession.length > 0) {
+        lastSessionLog = forSession[forSession.length - 1];
+      }
+    } catch (e) {
+      console.error('Cannot read last session log:', e);
+    }
+
+    const isContinuation =
+      effectiveMode === 'product' &&
+      !!lastSessionLog &&
+      isContinuationQuestion(question);
+
+
+         // ============================================================
+    // REGEX pre kategórie – vychádzajú z JSON súboru / feedu
+    // ============================================================
+    const MEN_CATEGORY_REGEX =
+      /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|smart hodinky pánske)/i;
+
+    const WOMEN_CATEGORY_REGEX =
+      /(dámsk|damsk|damsky|zen|žena|zena|women|lady|ladies|hodinky dámske)/i;
+
+    const KIDS_CATEGORY_REGEX =
+      /(detsk|guardkid|tiny|ultra|pre deti|dieta|dieťa)/i;
+
+    const PET_CATEGORY_REGEX =
+      /(dogsafe|lokator|lokátor|zviera|pet|pes|pre psa)/i;
+
+    // =========================
     // RAG vyhladavanie
     // =========================
-    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-    let hits = await search(openai, queryForSearch, 8, { domain });
 
-    // Debug výpis – nechaj, pomôže pri ladení
-    console.log('🔍 RAG DEBUG QUERY:', queryForSearch);
-    hits.forEach((h: any, i: number) => {
-      console.log(
-        ` #${i + 1} | score=${h.score?.toFixed?.(3)} | name=${h.meta?.name} | url=${h.meta?.url}`
-      );
-    });
+    // ak je to pokračovanie, snažíme sa držať sa posledného produktu
+    let queryForSearch: string;
+
+    let baseProductName: string | null = null;
+    if (isContinuation && lastSessionLog && Array.isArray(lastSessionLog.ragHits)) {
+      const lastProductHit = lastSessionLog.ragHits[0];
+      if (lastProductHit && lastProductHit.name) {
+        baseProductName = String(lastProductHit.name);
+      }
+    }
+
+    if (isContinuation && baseProductName) {
+      // Doplňujúca otázka – sústreď sa na varianty / farby toho istého modelu
+      queryForSearch = `
+Varianty, farby alebo verzie produktu Carneo: ${baseProductName}
+Doplňujúca otázka zákazníka: ${question}
+`;
+    } else {
+      // bežný dopyt
+      queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+    }
+
+    let hits = await search(openai, queryForSearch, 6, { domain });
 
     // -----------------------------------------------
-    // Pomocné funkcie – názov, URL, kategória
+    // HEURISTIKY – extrémne rýchle filtrovanie
     // -----------------------------------------------
     function getName(h: any): string {
       return (h.meta?.name || h.meta?.title || '').toString();
     }
 
-    function getUrl(h: any): string {
-      return (h.meta?.url || '').toString().toLowerCase();
-    }
-
-    function getCategoryMeta(h: any): string {
+    function getCategory(h: any): string {
       return (
         h.meta?.category ||
         h.meta?.categories ||
@@ -475,42 +553,50 @@ Formát:
       ).toString().toLowerCase();
     }
 
-    // -----------------------------------------------
-    // Klasifikácia produktu podľa URL + názvu + kategórie
-    // -----------------------------------------------
-    function classifyProduct(h: any) {
-      const name = getName(h).toLowerCase();
-      const url = getUrl(h);
-      const cat = getCategoryMeta(h);
-      const blob = `${name} ${url} ${cat}`;
-
-      const isMen =
-        // primárne podľa URL
-        /panske-smart-hodinky|hodinky-panske/.test(url) ||
-        // alebo podľa textu, ale iba ak to NIE je jasne dámske
-        (/(pánsk|panske|pansky)/.test(blob) &&
-          !/(dámsk|damsk|dámske|damske)/.test(blob));
-
-      const isWomen =
-        /damske-smart-hodinky|hodinky-damske/.test(url) ||
-        /(dámsk|damsk|dámske|damske|lady|women)/.test(blob);
-
-      const isKids =
-        /guardkid/.test(blob) ||
-        /detske-smart-hodinky|detske-gps-hodinky/.test(url) ||
-        /(detské|detske|pre deti)/.test(blob);
-
-      const isPet =
-        /dogsafe/.test(blob) ||
-        /gps-lokator-pre-psa|lokator-pre-domacich-milacikov/.test(url);
-
-      const hasGps = /gps/.test(blob);
-
-      return { isMen, isWomen, isKids, isPet, hasGps };
+    function isKidProduct(name: string = '') {
+      return /guardkid|detské|detske|tiny|ultra/i.test(name);
     }
 
+    function isPetProduct(name: string = '') {
+      return /dogsafe|lokátor|lokator|zvierat|pet/i.test(name);
+    }
+
+    function isWomenProduct(name: string = '', cat: string = '') {
+      const s = (name + ' ' + cat).toLowerCase();
+      return /dámsk|damsk|dámske|damske|lady|woman|women/.test(s);
+    }
+
+    function isMenQuery(q: string) {
+      return /pánsk|panske|pansky/.test(q);
+    }
+    function isKidsQuery(q: string) {
+      return /detské|detske|pre deti|dieta|dieťa/.test(q);
+    }
+    function isPetQuery(q: string) {
+      return /pes|psa|psovi|psom|zviera|dogsafe/.test(q);
+    }
+
+    const qLower = question.toLowerCase();
+
+    let filteredHits = hits;
+
+    // ------- 1) EXTRÉMNE HEURISTIKY ---------
+    if (isMenQuery(qLower)) {
+      filteredHits = filteredHits.filter((h: any) => {
+        const name = getName(h);
+        const cat = getCategory(h);
+        return !isKidProduct(name) && !isPetProduct(name) && !isWomenProduct(name, cat);
+      });
+    } else if (isKidsQuery(qLower)) {
+      filteredHits = filteredHits.filter((h: any) => isKidProduct(getName(h)));
+    } else if (isPetQuery(qLower)) {
+      filteredHits = filteredHits.filter((h: any) => isPetProduct(getName(h)));
+    }
+
+    if (filteredHits.length > 0) hits = filteredHits;
+
     // --------------------------------------------------------
-    // CATEGORY LOCKDOWN – tvrdý filter podľa dotazu
+    // 2) CATEGORY LOCKDOWN – PRIMÁRNY, tvrdý filter
     // --------------------------------------------------------
     function applyCategoryLockdown(hitsIn: any[], question: string) {
       const q = question.toLowerCase();
@@ -519,47 +605,39 @@ Formát:
       const wantsMen = /pánsk|panske|pansky/.test(q);
       const wantsWomen = /dámsk|damsk|damsky/.test(q);
       const wantsKids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
-      const wantsPet = /pes|psa|psovi|dogsafe|zviera/.test(q);
+      const wantsPet = /pes|psa|psovi|dogsafe/.test(q);
       const gpsRequired = /\bgps\b/.test(q);
 
-      function filterStrict(
-        predicate: (p: ReturnType<typeof classifyProduct>) => boolean
-      ) {
-        const filtered = out.filter(h => predicate(classifyProduct(h)));
-        // Ak by nič nenašlo, radšej vrátime pôvodný zoznam (nech radšej poradí niečo,
-        // než aby tvrdil, že nič neexistuje)
+      function filterByCat(regex: RegExp) {
+        const filtered = out.filter(
+          h =>
+            regex.test(getCategory(h)) ||
+            regex.test(h.meta?.name || '')
+        );
         return filtered.length > 0 ? filtered : out;
       }
 
-      if (wantsMen) {
-        // 1) vyber iba pánske modely
-        out = filterStrict(p => p.isMen);
+      // primárna kategória
+      if (wantsMen) out = filterByCat(MEN_CATEGORY_REGEX);
+      if (wantsWomen) out = filterByCat(WOMEN_CATEGORY_REGEX);
+      if (wantsKids) out = filterByCat(KIDS_CATEGORY_REGEX);
+      if (wantsPet) out = filterByCat(PET_CATEGORY_REGEX);
 
-        // 2) poistka – ak by aj tak ostali vyslovene dámske/detské/pet, vyhoď ich
-        out = out.filter(h => {
-          const p = classifyProduct(h);
-          return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
-        });
-      } else if (wantsWomen) {
-        out = filterStrict(p => p.isWomen);
-      } else if (wantsKids) {
-        out = filterStrict(p => p.isKids);
-      } else if (wantsPet) {
-        out = filterStrict(p => p.isPet);
-      }
-
-      // Ak dotaz obsahuje GPS → nechaj len modely s GPS
+      // GPS → nechaj len GPS modely
       if (gpsRequired) {
-        const gpsHits = out.filter(h => classifyProduct(h).hasGps);
-        if (gpsHits.length > 0) {
-          out = gpsHits;
-        }
+        const gpsHits = out.filter(
+          h =>
+            /gps/i.test(h.text || '') ||
+            /gps/i.test(h.meta?.name || '') ||
+            /gps/i.test(JSON.stringify(h.meta || {}))
+        );
+        if (gpsHits.length > 0) out = gpsHits;
       }
 
       return out;
     }
 
-    // Použiť lockdown na výsledky z RAG
+    // Použiť lockdown
     hits = applyCategoryLockdown(hits, question);
 
     // --------------------------------------------------
@@ -576,7 +654,7 @@ Formát:
         )}...${urlPart}${imagePart}`;
       })
       .join('\n');
-
+    
 // ...
     // Heuristika: je otázka dostatočne špecifická?
     const isSpecificProductQuery =
