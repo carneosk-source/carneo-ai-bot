@@ -439,13 +439,17 @@ Formát:
         break;
     }
 
-    // =========================
+ // =========================
 // RAG vyhladavanie
 // =========================
-const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-const hits = await search(openai, queryForSearch, 6, { domain });
 
-// ak existuje aspoň 1 produktový RAG hit → nikdy netvrd', že produkt neexistuje
+// 1. Zloženie dotazu pre RAG
+const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+
+// 2. Vyhľadanie v správnom indexe (products / tech / general)
+let hits = await search(openai, queryForSearch, 6, { domain });
+
+// 3. Ak existuje aspoň 1 produktový RAG hit → nikdy netvrd', že produkt neexistuje
 if (effectiveMode === 'product' && hits.length > 0) {
   systemExtra += `
 Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
@@ -453,11 +457,6 @@ nikdy netvrd', že produkt Carneo neexistuje.
 Namiesto toho ho normálne odporuč.
 `;
 }
-
-const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
-
-
-
     // HEURISTICKÝ FILTER PODĽA KATEGÓRIÍ (chráni pred miešaním pánske/detské/pes)
 function isKidProduct(name: string = '') {
   return /guardkid|detské|detske|tiny|ultra/i.test(name);
