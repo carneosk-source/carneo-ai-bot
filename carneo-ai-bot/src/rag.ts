@@ -139,13 +139,24 @@ export async function search(openai: any, query: string, k = 6, options: any = {
 
   const queryVector = embResp.data[0].embedding as number[];
 
-  const scored = index
-    .map((doc) => ({
-      ...doc,
-      score: cosineSimilarity(queryVector, doc.embedding)
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
+  const scoredRaw = index
+  .map((doc) => ({
+    ...doc,
+    score: cosineSimilarity(queryVector, doc.embedding)
+  }))
+  .sort((a, b) => b.score - a.score);
 
-  return scored;
+// DEBUG: log top 5
+console.log("\n🔍 RAG DEBUG QUERY:", query);
+for (let i = 0; i < Math.min(5, scoredRaw.length); i++) {
+  console.log(
+    ` #${i + 1} | score=${scoredRaw[i].score.toFixed(3)} | name=${scoredRaw[i].meta?.name}`
+  );
+}
+
+// nový threshold
+const MIN_SCORE = 0.18; // bezpečné nízke, nech prstene vždy nájde
+const scored = scoredRaw.filter(d => d.score >= MIN_SCORE).slice(0, k);
+
+return scored;
 }
