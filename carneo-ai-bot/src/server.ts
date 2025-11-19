@@ -697,18 +697,17 @@ app.get('/api/admin/chat-logs', async (req, res) => {
 });
 
 // ============ ADMIN: PREHĽAD POSLEDNÝCH CHATOV ============
+// ============ ADMIN: PREHĽAD POSLEDNÝCH CHATOV ============
 app.get('/admin/chat-logs', (req, res) => {
   const token = req.query.token as string | undefined;
   const adminToken = process.env.ADMIN_LOGS_TOKEN;
 
-  // musí byť nastavený v env na Renderi
   if (!adminToken) {
     return res
       .status(500)
       .json({ error: 'ADMIN_LOGS_TOKEN nie je nastavený na serveri' });
   }
 
-  // jednoduchá ochrana heslom v query stringu
   if (token !== adminToken) {
     return res.status(403).json({ error: 'Forbidden' });
   }
@@ -716,7 +715,6 @@ app.get('/admin/chat-logs', (req, res) => {
   fs.readFile(LOG_FILE, 'utf8', (err, data) => {
     if (err) {
       if ((err as any).code === 'ENOENT') {
-        // súbor ešte neexistuje – žiadne logy
         return res.json([]);
       }
       console.error('Read log error:', err);
@@ -727,7 +725,6 @@ app.get('/admin/chat-logs', (req, res) => {
       .split('\n')
       .filter((l) => l.trim().length > 0);
 
-    // vezmeme posledných 100 záznamov
     const last = lines.slice(-100).map((line) => {
       try {
         return JSON.parse(line);
@@ -791,7 +788,6 @@ app.get('/api/admin/logs', requireAdminKey, (req, res) => {
       });
     }
 
-    // najnovšie ako prvé
     filtered = filtered.sort(
       (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
     );
@@ -864,7 +860,7 @@ app.get('/api/admin/rag-tech-download', requireAdminKey, (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', 'attachment; filename="rag-tech.jsonl"');
+    res.setHeader('Content-Disposition', 'attachment; filename="rag-tech.jsonl"`);
 
     const stream = fs.createReadStream(TECH_RAG_FILE);
     stream.on('error', (err) => {
@@ -880,16 +876,8 @@ app.get('/api/admin/rag-tech-download', requireAdminKey, (req, res) => {
   }
 });
 
-
-
-app.get('/api/admin/import-emails', async (req, res) => {
-  const key =
-    String(req.query.adminKey || req.query.key || req.body?.adminKey || req.body?.key || '');
-
-  if (!ADMIN_KEY || key !== ADMIN_KEY) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+// ADMIN – IMAP import
+app.get('/api/admin/import-emails', requireAdminKey, async (req, res) => {
   try {
     await importEmailsFromImap();
     res.json({ ok: true });
@@ -900,14 +888,9 @@ app.get('/api/admin/import-emails', async (req, res) => {
 });
 
 // ADMIN – manuálny import support e-mailov do tech knowledge base
-app.post('/api/admin/import-support-emails', async (req, res) => {
+app.post('/api/admin/import-support-emails', requireAdminKey, async (req, res) => {
   try {
-    const { adminKey, limit } = req.body || {};
-
-    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
+    const { limit } = req.body || {};
     const max = typeof limit === 'number' && limit > 0 && limit <= 500 ? limit : 50;
     const result = await importSupportEmailsOnce(max);
 
@@ -922,15 +905,10 @@ app.post('/api/admin/import-support-emails', async (req, res) => {
   }
 });
 
-
 // ADMIN – uloženie manuálneho hodnotenia odpovede (C3)
-app.post('/api/admin/rate', (req, res) => {
+app.post('/api/admin/rate', requireAdminKey, (req, res) => {
   try {
-    const { adminKey, sessionId, ts, rating, note } = req.body || {};
-
-    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    const { sessionId, ts, rating, note } = req.body || {};
 
     if (!sessionId || !ts || !rating) {
       return res.status(400).json({
@@ -944,11 +922,10 @@ app.post('/api/admin/rate', (req, res) => {
       });
     }
 
-    // zapíšeme do logu samostatnú položku typu "rating"
     appendChatLog({
       type: 'rating',
       sessionId,
-      targetTs: ts, // k čomu sa rating vzťahuje
+      targetTs: ts,
       rating,
       note: note || null
     });
@@ -963,13 +940,12 @@ app.post('/api/admin/rate', (req, res) => {
 // ───────────────────────────────
 // CRON JOB – import IMAP emailov raz denne
 // ───────────────────────────────
-// Spustí sa každý deň o 03:00 ráno (server time)
 cron.schedule('0 3 * * *', async () => {
-  console.log("CRON: Spúšťam IMAP import...");
+  console.log('CRON: Spúšťam IMAP import...');
   try {
     await importEmailsFromImap();
   } catch (e) {
-    console.error("CRON IMAP error:", e);
+    console.error('CRON IMAP error:', e);
   }
 });
 
