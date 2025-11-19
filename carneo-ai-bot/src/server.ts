@@ -227,15 +227,17 @@ app.post('/api/admin/rag-tech-add-note', async (req, res) => {
 
 app.post('/api/ask', async (req, res) => {
   try {
-     const { question, mode, sessionId } = req.body as {
+    const { question, mode, sessionId } = req.body as {
       question?: string;
       mode?: 'product' | 'order' | 'tech' | null;
       sessionId?: string | null;
     };
-        // 1) Najprv skontroluj otázku
+
+    // 1) Kontrola otázky
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Missing question' });
     }
+
     // 🔹 stabilný sessionId na serveri
     const sid =
       typeof sessionId === 'string' && sessionId.trim()
@@ -245,82 +247,83 @@ app.post('/api/ask', async (req, res) => {
             .slice(2, 8)}`;
 
     // ------------------------------------------
-// AUTOMATICKÉ ROZPOZNANIE TYPU OTÁZKY
-// ------------------------------------------
+    // AUTOMATICKÉ ROZPOZNANIE TYPU OTÁZKY
+    // ------------------------------------------
+    let effectiveMode: 'product' | 'order' | 'tech' | null = mode ?? null;
 
-let effectiveMode: 'product' | 'order' | 'tech' | null = mode ?? null;
+    // Ak používateľ neklikol žiadnu možnosť vo widgete,
+    // automaticky odhadneme podľa textu otázky.
+    if (!effectiveMode) {
+      const q = question.toLowerCase();
 
-// Ak používateľ neklikol žiadnu možnosť vo widgete,
-/// automaticky odhadneme podľa textu otázky.
-if (!effectiveMode) {
-  const q = question.toLowerCase();
+      const isOrder =
+        q.includes('objednavk') ||
+        q.includes('objednávk') ||
+        q.includes('cislo objednavky') ||
+        q.includes('číslo objednávky') ||
+        q.includes('dorucen') ||
+        q.includes('doručen') ||
+        q.includes('doprava') ||
+        q.includes('dodanie') ||
+        q.includes('faktura') ||
+        q.includes('faktúra') ||
+        q.includes('reklamaci') ||
+        q.includes('reklamáci') ||
+        q.includes('vratenie') ||
+        q.includes('vrátenie') ||
+        q.includes('vratka');
 
-  const isOrder =
-    q.includes('objednavk') ||
-    q.includes('objednávk') ||
-    q.includes('cislo objednavky') ||
-    q.includes('číslo objednávky') ||
-    q.includes('dorucen') ||
-    q.includes('doručen') ||
-    q.includes('doprava') ||
-    q.includes('dodanie') ||
-    q.includes('faktura') ||
-    q.includes('faktúra') ||
-    q.includes('reklamaci') ||
-    q.includes('reklamáci') ||
-    q.includes('vratenie') ||
-    q.includes('vrátenie') ||
-    q.includes('vratka');
+      const isTech =
+        q.includes('nefunguje') ||
+        q.includes('nejde') ||
+        q.includes('spojit') ||
+        q.includes('spojiť') ||
+        q.includes('parovat') ||
+        q.includes('párovať') ||
+        q.includes('parovanie') ||
+        q.includes('párovanie') ||
+        q.includes('bluetooth') ||
+        q.includes('nabija') ||
+        q.includes('nabíja') ||
+        q.includes('nenabija') ||
+        q.includes('nenabíja') ||
+        q.includes('display') ||
+        q.includes('displej') ||
+        q.includes('problem') ||
+        q.includes('problém') ||
+        q.includes('manual') ||
+        q.includes('manuál');
 
-  const isTech =
-    q.includes('nefunguje') ||
-    q.includes('nejde') ||
-    q.includes('spojit') ||
-    q.includes('spojiť') ||
-    q.includes('parovat') ||
-    q.includes('párovať') ||
-    q.includes('parovanie') ||
-    q.includes('párovanie') ||
-    q.includes('bluetooth') ||
-    q.includes('nabija') ||
-    q.includes('nabíja') ||
-    q.includes('nenabija') ||
-    q.includes('nenabíja') ||
-    q.includes('display') ||
-    q.includes('displej') ||
-    q.includes('problem') ||
-    q.includes('problém') ||
-    q.includes('manual') ||
-    q.includes('manuál');
+      const isProduct =
+        /\bhodink|\bnaramok|\bnáramok|\bsmart\s?prsten|\bsmart\s?prsteň|\bprsten|\bprsteň|\bring|\bpay\s?ring|\bplatobny\s?prsten|\bplatobný\s?prsteň|\breproduktor|\bspeaker|\bglobus\b|\bnabytok\b/i.test(
+          q
+        ) ||
+        q.includes('hodink') ||
+        q.includes('naramok') ||
+        q.includes('náramok') ||
+        q.includes('prsten') ||
+        q.includes('prsteň') ||
+        q.includes('gps') ||
+        q.includes('vyber') ||
+        q.includes('výber') ||
+        q.includes('chcem hodinky') ||
+        q.includes('aku by ste odporucili') ||
+        q.includes('akú by ste odporučili') ||
+        q.includes('remienok') ||
+        q.includes('nahradny') ||
+        q.includes('náhradný');
 
-  const isProduct =
-    /\bhodink|\bnaramok|\bnáramok|\bsmart\s?prsten|\bsmart\s?prsteň|\bprsten|\bprsteň|\bring|\bpay\s?ring|\bplatobny\s?prsten|\bplatobný\s?prsteň|\breproduktor|\bspeaker|\bglobus\b|\bnabytok\b/i.test(q) ||
-    q.includes('hodink') ||
-    q.includes('naramok') ||
-    q.includes('náramok') ||
-    q.includes('prsten') ||
-    q.includes('prsteň') ||
-    q.includes('gps') ||
-    q.includes('vyber') ||
-    q.includes('výber') ||
-    q.includes('chcem hodinky') ||
-    q.includes('aku by ste odporucili') ||
-    q.includes('akú by ste odporučili') ||
-    q.includes('remienok') ||
-    q.includes('nahradny') ||
-    q.includes('náhradný');
-
-  if (isOrder) {
-    effectiveMode = 'order';
-  } else if (isTech) {
-    effectiveMode = 'tech';
-  } else if (isProduct) {
-    effectiveMode = 'product';
-  } else {
-    // ak sa nič nehodí → nechaj general
-    effectiveMode = 'product'; // môžeš dať aj null alebo general
-  }
-}
+      if (isOrder) {
+        effectiveMode = 'order';
+      } else if (isTech) {
+        effectiveMode = 'tech';
+      } else if (isProduct) {
+        effectiveMode = 'product';
+      } else {
+        // ak sa nič nehodí → defaultne product (môžeš dať aj null/general)
+        effectiveMode = 'product';
+      }
+    }
 
     // =========================
     // SYSTEM PROMPT (BASE + MODES)
@@ -342,7 +345,7 @@ namiesto odporucania inej znacky.
 Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo podpora).
 `;
 
-        let systemExtra = '';
+    let systemExtra = '';
     let searchHint = '';
     let domain: 'general' | 'products' | 'tech' = 'general';
 
@@ -369,10 +372,6 @@ Pri otázkach na výber produktu vždy rob toto:
   - GPS lokátor pre psov (názov obsahuje „DogSAFE“, „lokátor pre domácich miláčikov“).
 - ak zákazník píše o detských hodinkách, uprednostni modely GuardKid a neodporúčaj DogSAFE lokátor.
 - ak zákazník hľadá GPS pre psa alebo domáceho miláčika, odporúčaj výhradne DogSAFE lokátor, NIE hodinky.
-
-- Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
-  nikdy netvrd', že produkt Carneo neexistuje.
-  Namiesto toho ho normálne odporuč.
 
 Odpoveď píš prehľadne v bodoch 1., 2., 3.:
 - obrázok (ak existuje)
@@ -439,73 +438,55 @@ Formát:
         break;
     }
 
- // =========================
-// RAG vyhladavanie
-// =========================
+    // =========================
+    // RAG vyhladavanie
+    // =========================
+    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+    let hits = await search(openai, queryForSearch, 6, { domain });
 
-// 1. Zloženie dotazu pre RAG
-const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-
-// 2. Vyhľadanie v správnom indexe (products / tech / general)
-let hits = await search(openai, queryForSearch, 6, { domain });
-
-// 3. Ak existuje aspoň 1 produktový RAG hit → nikdy netvrd', že produkt neexistuje
-if (effectiveMode === 'product' && hits.length > 0) {
-  systemExtra += `
-Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
-nikdy netvrd', že produkt Carneo neexistuje.
-Namiesto toho ho normálne odporuč.
-`;
-}
     // HEURISTICKÝ FILTER PODĽA KATEGÓRIÍ (chráni pred miešaním pánske/detské/pes)
-function isKidProduct(name: string = '') {
-  return /guardkid|detské|detske|tiny|ultra/i.test(name);
-}
-function isPetProduct(name: string = '') {
-  return /dogsafe|lokátor|lokator|zvierat/i.test(name);
-}
-function isMenQuery(q: string) {
-  return /pánsk|panske|pansky/i.test(q);
-}
-function isKidsQuery(q: string) {
-  return /detské|detske|pre deti|dieta/i.test(q);
-}
-function isPetQuery(q: string) {
-  return /pes|psa|psovi|psom|zviera/i.test(q);
-}
+    function isKidProduct(name: string = '') {
+      return /guardkid|detské|detske|tiny|ultra/i.test(name);
+    }
+    function isPetProduct(name: string = '') {
+      return /dogsafe|lokátor|lokator|zvierat/i.test(name);
+    }
+    function isMenQuery(q: string) {
+      return /pánsk|panske|pansky/i.test(q);
+    }
+    function isKidsQuery(q: string) {
+      return /detské|detske|pre deti|dieta/i.test(q);
+    }
+    function isPetQuery(q: string) {
+      return /pes|psa|psovi|psom|zviera/i.test(q);
+    }
 
-// aplikácia filtra podľa typu dotazu
-let filteredHits = hits;
+    let filteredHits = hits;
 
-if (isMenQuery(question)) {
-  // pre pánske dotazy vyhoď detské a pet produkty
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return !isKidProduct(name) && !isPetProduct(name);
-  });
-}
+    if (isMenQuery(question)) {
+      filteredHits = hits.filter((h: any) => {
+        const name = h.meta?.name || h.meta?.title || '';
+        return !isKidProduct(name) && !isPetProduct(name);
+      });
+    }
 
-if (isKidsQuery(question)) {
-  // pre detské dotazy nechaj len detské produkty
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return isKidProduct(name);
-  });
-}
+    if (isKidsQuery(question)) {
+      filteredHits = hits.filter((h: any) => {
+        const name = h.meta?.name || h.meta?.title || '';
+        return isKidProduct(name);
+      });
+    }
 
-if (isPetQuery(question)) {
-  // pre dotazy na psa/zviera nechaj len pet produkty
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return isPetProduct(name);
-  });
-}
+    if (isPetQuery(question)) {
+      filteredHits = hits.filter((h: any) => {
+        const name = h.meta?.name || h.meta?.title || '';
+        return isPetProduct(name);
+      });
+    }
 
-// ak sa odfiltruje všetko, nechaj pôvodné hits
-if (filteredHits.length > 0) {
-  hits.length = 0;
-  hits.push(...filteredHits);
-}
+    if (filteredHits.length > 0) {
+      hits = filteredHits;
+    }
 
     const citations = hits
       .map((h, i) => {
@@ -519,29 +500,25 @@ if (filteredHits.length > 0) {
       })
       .join('\n');
 
-        // ─────────────────────────────────────────────
     // Heuristika: je otázka dostatočne špecifická?
-    // (rozpočet, GPS, pánske/dámske, šport atď.)
-    // ─────────────────────────────────────────────
     const isSpecificProductQuery =
-  effectiveMode === 'product' &&
-  /(\b\d+\s?(eur|€)\b|\bgps\b|\bpánsk|\bpanske|\bdámsk|\bdamske|\bdetsk|\bbehu|\bbeh\b|\bplávan|\bplavani|\bcyklo)/i.test(
-    question
-  );
+      effectiveMode === 'product' &&
+      /(\b\d+\s?(eur|€)\b|\bgps\b|\bpánsk|\bpanske|\bdámsk|\bdamske|\bdetsk|\bbehu|\bbeh\b|\bplávan|\bplavani|\bcyklo)/i.test(
+        question
+      );
+
+    // Ak existuje aspoň 1 RAG hit v produktovom režime → špeciálne pravidlo
+    if (effectiveMode === 'product' && hits.length > 0) {
+      systemExtra += `
+Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
+nikdy netvrd', že produkt Carneo neexistuje.
+Namiesto toho ho normálne odporuč.
+`;
+    }
 
     let prompt: string;
-// ak existuje aspoň 1 RAG hit → NIKDY nehovor že produkt neexistuje
-if (hits.length > 0) {
-  systemExtra += `
-  Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
-  nikdy netvrd', že produkt Carneo neexistuje.
-  Namiesto toho ho normálne odporuč.
-  `;
-}
-
 
     if (isSpecificProductQuery) {
-      // Otázka je už dosť konkrétna → rovno odporuč produkty
       prompt = `Otazka zakaznika:
 ${question}
 
@@ -564,7 +541,6 @@ Otazka uz obsahuje pomerne konkretne kriteria (napr. rozpocet, typ, GPS).
 3. Az NA KONCI (max 1–2 vety) pripadne navrhni, ake doplnujuce informacie by este pomohli.
 4. Neodpovedaj len dalsimi otazkami – zakaznik musi hned vidiet konkretne produkty.`;
     } else {
-      // Menej konkrétna otázka → môžeš si vypýtať doplnenie
       prompt = `Otazka zakaznika:
 ${question}
 
@@ -578,6 +554,9 @@ Pokyny:
 - Ak chyba dolezita informacia (napr. rozpocet, typ pouzitia, cislo objednavky), slusne si ju vypytaj, ale zaroven skus na zaklade dostupnych udajov aspon orientacne poradit.`;
     }
 
+    // Tu MUSÍ vzniknúť finálny system prompt (až po všetkých úpravách systemExtra)
+    const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
+
     const response = await openai.responses.create({
       model: MODEL,
       input: [
@@ -590,7 +569,7 @@ Pokyny:
       (response as any).output_text ??
       (response as any).content?.[0]?.text ??
       '—';
-      
+
     // 🔹 uloženie logu konverzácie
     appendChatLog({
       sessionId: sid,
@@ -599,20 +578,20 @@ Pokyny:
       modeFromClient: mode ?? null,
       effectiveMode,
       domain,
-      ragHits: hits.map((h) => ({
+      ragHits: hits.map((h: any) => ({
         id: h.id,
-        name: (h as any).meta?.name || (h as any).meta?.file,
-        url: (h as any).meta?.url,
-        score: (h as any).score
+        name: h.meta?.name || h.meta?.file,
+        url: h.meta?.url,
+        score: h.score
       }))
     });
 
-        res.json({
+    res.json({
       answer,
-      sources: hits.map((h) => ({
-        file: (h as any).meta?.file || (h as any).meta?.name,
+      sources: hits.map((h: any) => ({
+        file: h.meta?.file || h.meta?.name,
         id: h.id,
-        url: (h as any).meta?.url
+        url: h.meta?.url
       }))
     });
   } catch (error) {
