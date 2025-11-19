@@ -438,121 +438,154 @@ Formát:
         break;
     }
 
-   // =========================
-// RAG vyhladavanie
-// =========================
-const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-let hits = await search(openai, queryForSearch, 6, { domain });
+    // =========================
+    // RAG vyhladavanie
+    // =========================
+    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+    let hits = await search(openai, queryForSearch, 6, { domain });
 
-// -----------------------------------------------
-// HEURISTIKY PRE NAZVY (rýchle vyhodenie extrémov)
-// -----------------------------------------------
-function isKidProduct(name: string = '') {
-  return /guardkid|detské|detske|tiny|ultra/i.test(name);
-}
-function isPetProduct(name: string = '') {
-  return /dogsafe|lokátor|lokator|zvierat/i.test(name);
-}
-function isMenQuery(q: string) {
-  return /pánsk|panske|pansky/i.test(q);
-}
-function isKidsQuery(q: string) {
-  return /detské|detske|pre deti|dieta/i.test(q);
-}
-function isPetQuery(q: string) {
-  return /pes|psa|psovi|psom|zviera/i.test(q);
-}
+    // -----------------------------------------------
+    // HEURISTIKY PRE NAZVY (rýchle vyhodenie extrémov)
+    // -----------------------------------------------
+    function getName(h: any): string {
+      return (h.meta?.name || h.meta?.title || '').toString();
+    }
 
-// RÝCHLA HEURISTIKA – len extrémne prípady
-let filteredHits = hits;
+    function getCategory(h: any): string {
+      return (
+        h.meta?.category ||
+        h.meta?.categories ||
+        ''
+      ).toString().toLowerCase();
+    }
 
-if (isMenQuery(question)) {
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return !isKidProduct(name) && !isPetProduct(name);
-  });
-} else if (isKidsQuery(question)) {
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return isKidProduct(name);
-  });
-} else if (isPetQuery(question)) {
-  filteredHits = hits.filter((h: any) => {
-    const name = h.meta?.name || h.meta?.title || '';
-    return isPetProduct(name);
-  });
-}
+    function isKidProduct(name: string = '') {
+      return /guardkid|detské|detske|tiny|ultra/i.test(name);
+    }
+    function isPetProduct(name: string = '') {
+      return /dogsafe|lokátor|lokator|zvierat/i.test(name);
+    }
+    function isWomenProduct(name: string = '', cat: string = '') {
+      const s = (name + ' ' + cat).toLowerCase();
+      return /dámsk|damsk|dámske|damske|lady|woman|women/.test(s);
+    }
 
-if (filteredHits.length > 0) {
-  hits = filteredHits;
-}
+    function isMenQuery(q: string) {
+      return /pánsk|panske|pansky/i.test(q);
+    }
+    function isKidsQuery(q: string) {
+      return /detské|detske|pre deti|dieta|dieťa/i.test(q);
+    }
+    function isPetQuery(q: string) {
+      return /pes|psa|psovi|psom|zviera|dogsafe/i.test(q);
+    }
 
-// --------------------------------------------------------
-// CATEGORY LOCKDOWN – PRIMÁRNE FILTER PODĽA DOTAZU
-// --------------------------------------------------------
-function getCategory(h: any): string {
-  return (
-    h.meta?.category ||
-    h.meta?.categories ||
-    ''
-  ).toString().toLowerCase();
-}
+    const qLower = question.toLowerCase();
 
-function applyCategoryLockdown(hitsIn: any[], question: string) {
-  const q = question.toLowerCase();
+    // RÝCHLA HEURISTIKA – len extrémne prípady
+    let filteredHits = hits;
 
-  const men = /pánsk|panske|pansky/.test(q);
-  const women = /dámsk|damsk|damsky/.test(q);
-  const kids = /detsk|guardkid|tiny|pre deti|dieťa/.test(q);
-  const pet = /pes|psa|psovi|dogsafe/.test(q);
-  const gpsRequired = /\bgps\b/.test(q);
+    if (isMenQuery(qLower)) {
+      // pre pánske: vyhoď detské, pet a výrazne dámske
+      filteredHits = filteredHits.filter((h: any) => {
+        const name = getName(h);
+        const cat = getCategory(h);
+        return !isKidProduct(name) && !isPetProduct(name) && !isWomenProduct(name, cat);
+      });
+    } else if (isKidsQuery(qLower)) {
+      // pre detské: nechaj len detské / GuardKid / Tiny
+      filteredHits = filteredHits.filter((h: any) => {
+        const name = getName(h);
+        return isKidProduct(name);
+      });
+    } else if (isPetQuery(qLower)) {
+      // pre psa/zviera: nechaj len DogSafe / pet
+      filteredHits = filteredHits.filter((h: any) => {
+        const name = getName(h);
+        return isPetProduct(name);
+      });
+    }
 
-  let out = hitsIn;
+    if (filteredHits.length > 0) {
+      hits = filteredHits;
+    }
 
-  function filterByCategory(catCheck: (cat: string) => boolean) {
-    const filtered = out.filter(h => catCheck(getCategory(h)));
-    return filtered.length > 0 ? filtered : out;
-  }
+    // --------------------------------------------------------
+    // CATEGORY LOCKDOWN – PRIMÁRNY FILTER PODĽA DOTAZU
+    // --------------------------------------------------------
+    function applyCategoryLockdown(hList: any[], question: string): any[] {
+      const q = question.toLowerCase();
 
-  if (men) {
-    out = filterByCategory(cat => /pánsk|panske/.test(cat));
-  } else if (women) {
-    out = filterByCategory(cat => /dámsk|damske/.test(cat));
-  } else if (kids) {
-    out = filterByCategory(cat => /detsk|guardkid|tiny/.test(cat));
-  } else if (pet) {
-    out = filterByCategory(cat => /dogsafe|lokat|zviera/.test(cat));
-  }
+      const men = /pánsk|panske|pansky/.test(q);
+      const women = /dámsk|damsk|damsky/.test(q);
+      const kids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
+      const pet = /pes|psa|psovi|dogsafe/.test(q);
+      const gpsRequired = /\bgps\b/.test(q);
 
-  if (gpsRequired) {
-    const gpsHits = out.filter(h =>
-      /gps/i.test(h.text) ||
-      /gps/i.test(h.meta?.name || '') ||
-      /gps/i.test(JSON.stringify(h.meta))
-    );
-    if (gpsHits.length > 0) out = gpsHits;
-  }
+      function filterByCategory(catCheck: (cat: string) => boolean) {
+        const filtered = hList.filter(h => catCheck(getCategory(h)));
+        return filtered.length > 0 ? filtered : hList;
+      }
 
-  return out;
-}
+      let out = hList;
 
-// FINÁLNY FILTER
-hits = applyCategoryLockdown(hits, question);
+      if (men) {
+        // snaž sa držať kategórie "pánske" – ak nič, nechaj pôvodné
+        out = filterByCategory(cat =>
+          /pánsk|panske/.test(cat) && !/dámsk|damsk/.test(cat)
+        );
+      }
 
-// --------------------------------------------------
-// CITÁCIE (až teraz, keď máme finálne hits)
-// --------------------------------------------------
-const citations = hits
-  .map((h, i) => {
-    const meta: any = h.meta || {};
-    const urlPart = meta.url ? ` URL: ${meta.url}` : '';
-    const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
-    return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
-      0,
-      180
-    )}...${urlPart}${imagePart}`;
-  })
-  .join('\n');
+      if (women) {
+        out = filterByCategory(cat =>
+          /dámsk|damsk/.test(cat)
+        );
+      }
+
+      if (kids) {
+        out = filterByCategory(cat =>
+          /detsk|guardkid|tiny/.test(cat)
+        );
+      }
+
+      if (pet) {
+        out = filterByCategory(cat =>
+          /dogsafe|lokator|lokátor|zviera/.test(cat)
+        );
+      }
+
+      // Ak dotaz obsahuje GPS → preferuj / filtruj len GPS produkty
+      if (gpsRequired) {
+        const gpsHits = out.filter(h =>
+          /gps/i.test(h.text || '') ||
+          /gps/i.test(getName(h)) ||
+          /gps/i.test(JSON.stringify(h.meta || {}))
+        );
+        if (gpsHits.length > 0) {
+          out = gpsHits;
+        }
+      }
+
+      return out;
+    }
+
+    // FINÁLNY FILTER – category lockdown
+    hits = applyCategoryLockdown(hits, question);
+
+    // --------------------------------------------------
+    // CITÁCIE (až teraz, keď máme finálne hits)
+    // --------------------------------------------------
+    const citations = hits
+      .map((h: any, i: number) => {
+        const meta: any = h.meta || {};
+        const urlPart = meta.url ? ` URL: ${meta.url}` : '';
+        const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
+        return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
+          0,
+          180
+        )}...${urlPart}${imagePart}`;
+      })
+      .join('\n');
 
 // ...
     // Heuristika: je otázka dostatočne špecifická?
