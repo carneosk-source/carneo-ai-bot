@@ -915,7 +915,7 @@ app.get('/api/admin/rag-tech-download', requireAdminKey, (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', 'attachment; filename="rag-tech.jsonl"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="rag-tech.jsonl"');
 
     const stream = fs.createReadStream(TECH_RAG_FILE);
     stream.on('error', (err) => {
