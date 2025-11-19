@@ -465,14 +465,6 @@ function isPetQuery(q: string) {
 // aplikácia filtra
 let filteredHits = hits;
 
-if (isMenQuery(question)) {
-  filteredHits = hits.filter(h => !isKidProduct(h.meta?.name) && !isPetProduct(h.meta?.name));
-}
-if (isKidsQuery(question)) {
-  filteredHits = hits.filter(h => isKidProduct(h.meta?.name));
-}
-if (isPetQuery(question)) {
-  filteredHits = hits.filter(h => isPetProduct(h.meta?.name));
 }
 
 // ak sa odfiltruje všetko, nechaj pôvodné
