@@ -439,12 +439,22 @@ Formát:
         break;
     }
 
-    const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
+    // =========================
+// RAG vyhladavanie
+// =========================
+const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+const hits = await search(openai, queryForSearch, 6, { domain });
 
-    // =========================
-    // RAG vyhladavanie
-    // =========================
-    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+// ak existuje aspoň 1 produktový RAG hit → nikdy netvrd', že produkt neexistuje
+if (effectiveMode === 'product' && hits.length > 0) {
+  systemExtra += `
+Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
+nikdy netvrd', že produkt Carneo neexistuje.
+Namiesto toho ho normálne odporuč.
+`;
+}
+
+const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
 
     // product rezim pouziva produktovy index, ostatne general
     const hits = await search(openai, queryForSearch, 6, { domain });
