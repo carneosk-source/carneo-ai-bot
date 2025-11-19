@@ -346,7 +346,9 @@ Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo pod
     let searchHint = '';
     let domain: 'general' | 'products' | 'tech' = 'general';
 
-    switch (effectiveMode) {
+    if (effectiveMode === 'product') {
+  domain = 'products';
+}
       case 'product':
   systemExtra = `
 Pri otázkach na výber produktu vždy rob toto:
