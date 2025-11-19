@@ -456,8 +456,7 @@ Namiesto toho ho normálne odporuč.
 
 const system = systemExtra ? `${baseSystem}\n${systemExtra}` : baseSystem;
 
-    // product rezim pouziva produktovy index, ostatne general
-    const hits = await search(openai, queryForSearch, 6, { domain });
+
 
     // HEURISTICKÝ FILTER PODĽA KATEGÓRIÍ (chráni pred miešaním pánske/detské/pes)
 function isKidProduct(name: string = '') {
