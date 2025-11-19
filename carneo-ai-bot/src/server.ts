@@ -438,68 +438,123 @@ Formát:
         break;
     }
 
-    // =========================
-    // RAG vyhladavanie
-    // =========================
-    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-    let hits = await search(openai, queryForSearch, 6, { domain });
+   // =========================
+// RAG vyhladavanie
+// =========================
+const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+let hits = await search(openai, queryForSearch, 6, { domain });
 
-    // HEURISTICKÝ FILTER PODĽA KATEGÓRIÍ (chráni pred miešaním pánske/detské/pes)
-    function isKidProduct(name: string = '') {
-      return /guardkid|detské|detske|tiny|ultra/i.test(name);
-    }
-    function isPetProduct(name: string = '') {
-      return /dogsafe|lokátor|lokator|zvierat/i.test(name);
-    }
-    function isMenQuery(q: string) {
-      return /pánsk|panske|pansky/i.test(q);
-    }
-    function isKidsQuery(q: string) {
-      return /detské|detske|pre deti|dieta/i.test(q);
-    }
-    function isPetQuery(q: string) {
-      return /pes|psa|psovi|psom|zviera/i.test(q);
-    }
+// -----------------------------------------------
+// HEURISTIKY PRE NAZVY (rýchle vyhodenie extrémov)
+// -----------------------------------------------
+function isKidProduct(name: string = '') {
+  return /guardkid|detské|detske|tiny|ultra/i.test(name);
+}
+function isPetProduct(name: string = '') {
+  return /dogsafe|lokátor|lokator|zvierat/i.test(name);
+}
+function isMenQuery(q: string) {
+  return /pánsk|panske|pansky/i.test(q);
+}
+function isKidsQuery(q: string) {
+  return /detské|detske|pre deti|dieta/i.test(q);
+}
+function isPetQuery(q: string) {
+  return /pes|psa|psovi|psom|zviera/i.test(q);
+}
 
-    let filteredHits = hits;
+// RÝCHLA HEURISTIKA – len extrémne prípady
+let filteredHits = hits;
 
-    if (isMenQuery(question)) {
-      filteredHits = hits.filter((h: any) => {
-        const name = h.meta?.name || h.meta?.title || '';
-        return !isKidProduct(name) && !isPetProduct(name);
-      });
-    }
+if (isMenQuery(question)) {
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return !isKidProduct(name) && !isPetProduct(name);
+  });
+} else if (isKidsQuery(question)) {
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return isKidProduct(name);
+  });
+} else if (isPetQuery(question)) {
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return isPetProduct(name);
+  });
+}
 
-    if (isKidsQuery(question)) {
-      filteredHits = hits.filter((h: any) => {
-        const name = h.meta?.name || h.meta?.title || '';
-        return isKidProduct(name);
-      });
-    }
+if (filteredHits.length > 0) {
+  hits = filteredHits;
+}
 
-    if (isPetQuery(question)) {
-      filteredHits = hits.filter((h: any) => {
-        const name = h.meta?.name || h.meta?.title || '';
-        return isPetProduct(name);
-      });
-    }
+// --------------------------------------------------------
+// CATEGORY LOCKDOWN – PRIMÁRNE FILTER PODĽA DOTAZU
+// --------------------------------------------------------
+function getCategory(h: any): string {
+  return (
+    h.meta?.category ||
+    h.meta?.categories ||
+    ''
+  ).toString().toLowerCase();
+}
 
-    if (filteredHits.length > 0) {
-      hits = filteredHits;
-    }
+function applyCategoryLockdown(hitsIn: any[], question: string) {
+  const q = question.toLowerCase();
 
-    const citations = hits
-      .map((h, i) => {
-        const meta: any = h.meta || {};
-        const urlPart = meta.url ? ` URL: ${meta.url}` : '';
-        const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
-        return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
-          0,
-          180
-        )}...${urlPart}${imagePart}`;
-      })
-      .join('\n');
+  const men = /pánsk|panske|pansky/.test(q);
+  const women = /dámsk|damsk|damsky/.test(q);
+  const kids = /detsk|guardkid|tiny|pre deti|dieťa/.test(q);
+  const pet = /pes|psa|psovi|dogsafe/.test(q);
+  const gpsRequired = /\bgps\b/.test(q);
 
+  let out = hitsIn;
+
+  function filterByCategory(catCheck: (cat: string) => boolean) {
+    const filtered = out.filter(h => catCheck(getCategory(h)));
+    return filtered.length > 0 ? filtered : out;
+  }
+
+  if (men) {
+    out = filterByCategory(cat => /pánsk|panske/.test(cat));
+  } else if (women) {
+    out = filterByCategory(cat => /dámsk|damske/.test(cat));
+  } else if (kids) {
+    out = filterByCategory(cat => /detsk|guardkid|tiny/.test(cat));
+  } else if (pet) {
+    out = filterByCategory(cat => /dogsafe|lokat|zviera/.test(cat));
+  }
+
+  if (gpsRequired) {
+    const gpsHits = out.filter(h =>
+      /gps/i.test(h.text) ||
+      /gps/i.test(h.meta?.name || '') ||
+      /gps/i.test(JSON.stringify(h.meta))
+    );
+    if (gpsHits.length > 0) out = gpsHits;
+  }
+
+  return out;
+}
+
+// FINÁLNY FILTER
+hits = applyCategoryLockdown(hits, question);
+
+// --------------------------------------------------
+// CITÁCIE (až teraz, keď máme finálne hits)
+// --------------------------------------------------
+const citations = hits
+  .map((h, i) => {
+    const meta: any = h.meta || {};
+    const urlPart = meta.url ? ` URL: ${meta.url}` : '';
+    const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
+    return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
+      0,
+      180
+    )}...${urlPart}${imagePart}`;
+  })
+  .join('\n');
+
+// ...
     // Heuristika: je otázka dostatočne špecifická?
     const isSpecificProductQuery =
       effectiveMode === 'product' &&
