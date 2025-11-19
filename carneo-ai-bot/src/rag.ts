@@ -130,7 +130,7 @@ export async function search(openai: any, query: string, k = 6, options: any = {
   }
 
   const embeddingModel =
-    process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+  process.env.EMBEDDING_MODEL || 'text-embedding-3-large';
 
   const embResp = await openai.embeddings.create({
     model: embeddingModel,
