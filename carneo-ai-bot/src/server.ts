@@ -498,6 +498,15 @@ if (filteredHits.length > 0) {
   );
 
     let prompt: string;
+// ak existuje aspoň 1 RAG hit → NIKDY nehovor že produkt neexistuje
+if (hits.length > 0) {
+  systemExtra += `
+  Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
+  nikdy netvrd', že produkt Carneo neexistuje.
+  Namiesto toho ho normálne odporuč.
+  `;
+}
+
 
     if (isSpecificProductQuery) {
       // Otázka je už dosť konkrétna → rovno odporuč produkty
