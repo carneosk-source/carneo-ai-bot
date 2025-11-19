@@ -1045,112 +1045,152 @@
 </div>
 
     <script>
-  (function () {
+(function () {
+
+  // 🔑 SPOLOČNÁ FUNKCIA: VŽDY použi admin key z inputu, ak existuje,
+  // inak fallback z URL.
+  function getAdminKey() {
+    const input = document.getElementById("adminKey");
+    if (input && input.value.trim()) {
+      return input.value.trim();
+    }
     const urlParams = new URLSearchParams(window.location.search);
-    const adminKey = urlParams.get('key') || '';
+    return urlParams.get("key") || "";
+  }
 
-    const infoBtn = document.getElementById('btnTechInfo');
-    const importBtn = document.getElementById('btnTechImport');
-    const downloadBtn = document.getElementById('btnTechDownload');
-    const box = document.getElementById('techInfoBox');
+  // DOM prvky
+  const infoBtn = document.getElementById('btnTechInfo');
+  const importBtn = document.getElementById('btnTechImport');
+  const downloadBtn = document.getElementById('btnTechDownload');
+  const box = document.getElementById('techInfoBox');
 
-    const formManuals = document.getElementById('formTechManuals');
-    const inputManuals = document.getElementById('inputTechManuals');
+  const formManuals = document.getElementById('formTechManuals');
+  const inputManuals = document.getElementById('inputTechManuals');
 
-    const inputNoteTitle = document.getElementById('inputTechNoteTitle');
-    const inputNoteText = document.getElementById('inputTechNoteText');
-    const btnSaveNote = document.getElementById('btnSaveTechNote');
+  const inputNoteTitle = document.getElementById('inputTechNoteTitle');
+  const inputNoteText = document.getElementById('inputTechNoteText');
+  const btnSaveNote = document.getElementById('btnSaveTechNote');
 
-    function msg(text) {
-      box.textContent = text;
+
+  function msg(text) {
+    box.textContent = text;
+  }
+
+  // 🔍 ZOBRAZENIE STAVU DATAZÁZY (RAG)
+  infoBtn.addEventListener('click', async () => {
+    msg('Načítavam údaje...');
+    const key = getAdminKey();
+
+    try {
+      const res = await fetch(`/api/admin/rag-tech-info?key=${encodeURIComponent(key)}`);
+      const json = await res.json();
+      msg(JSON.stringify(json, null, 2));
+    } catch (e) {
+      msg('Chyba pri načítaní info: ' + e);
+    }
+  });
+
+  // 📥 IMAP IMPORT
+  importBtn.addEventListener('click', async () => {
+    const key = getAdminKey();
+    if (!key) {
+      alert("Chýba admin key!");
+      return;
+    }
+    if (!confirm('Naozaj spustiť IMAP import zo SENT priečinka?')) return;
+
+    msg('Spúšťam import...');
+    try {
+      const res = await fetch(`/api/admin/import-emails?key=${encodeURIComponent(key)}`);
+      const json = await res.json();
+      msg(JSON.stringify(json, null, 2));
+    } catch (e) {
+      msg('Chyba pri importe: ' + e);
+    }
+  });
+
+  // 📤 DOWNLOAD RAG SÚBORU
+  downloadBtn.addEventListener('click', () => {
+    const key = getAdminKey();
+    if (!key) return alert("Chýba admin key!");
+    window.open(`/api/admin/rag-tech-download?key=${encodeURIComponent(key)}`, "_blank");
+  });
+
+  // 📚 UPLOAD MANUÁLOV (PDF / TXT)
+  formManuals.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const key = getAdminKey();
+    if (!key) {
+      alert("Chýba admin key!");
+      return;
     }
 
-    // Stav databázy
-    infoBtn.addEventListener('click', async () => {
-      msg('Načítavam údaje...');
-      try {
-        const res = await fetch(`/api/admin/rag-tech-info?key=${adminKey}`);
-        const json = await res.json();
-        msg(JSON.stringify(json, null, 2));
-      } catch (e) {
-        msg('Chyba pri načítaní info: ' + e);
-      }
-    });
+    const files = inputManuals.files;
+    if (!files || !files.length) {
+      alert('Vyber aspoň jeden súbor.');
+      return;
+    }
 
-    // IMAP import
-    importBtn.addEventListener('click', async () => {
-      if (!confirm('Naozaj spustiť IMAP import zo SENT priečinka?')) return;
-      msg('Spúšťam import...');
-      try {
-        const res = await fetch(`/api/admin/import-emails?key=${adminKey}`);
-        const json = await res.json();
-        msg(JSON.stringify(json, null, 2));
-      } catch (e) {
-        msg('Chyba pri importe: ' + e);
-      }
-    });
+    msg('Nahrávam súbory...');
 
-    // Download JSONL
-    downloadBtn.addEventListener('click', () => {
-      const url = `/api/admin/rag-tech-download?key=${adminKey}`;
-      window.open(url, '_blank');
-    });
+    try {
+      const fd = new FormData();
+      fd.append('adminKey', key);
 
-    // UPLOAD MANUÁLOV (PDF/TXT)
-    formManuals.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const files = inputManuals.files;
-      if (!files || !files.length) {
-        alert('Vyber aspoň jeden súbor.');
-        return;
-      }
-      msg('Nahrávam súbory...');
-      try {
-        const fd = new FormData();
-        fd.append('adminKey', adminKey);
-        for (const f of files) {
-          fd.append('files', f);
-        }
-        const res = await fetch('/api/admin/rag-tech-upload-manuals', {
-          method: 'POST',
-          body: fd
-        });
-        const json = await res.json();
-        msg(JSON.stringify(json, null, 2));
-      } catch (err) {
-        msg('Chyba pri uploade: ' + err);
-      }
-    });
+      for (const f of files) fd.append('files', f);
 
-    // TEXTOVÁ POZNÁMKA TECHNIKA
-    btnSaveNote.addEventListener('click', async () => {
-      const title = (inputNoteTitle.value || '').trim();
-      const text = (inputNoteText.value || '').trim();
-      if (!text) {
-        alert('Text poznámky nesmie byť prázdny.');
-        return;
-      }
-      msg('Ukladám poznámku...');
-      try {
-        const res = await fetch('/api/admin/rag-tech-add-note', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminKey,
-            title,
-            text
-          })
-        });
-        const json = await res.json();
-        msg(JSON.stringify(json, null, 2));
-        if (json.ok) {
-          inputNoteText.value = '';
-        }
-      } catch (err) {
-        msg('Chyba pri ukladaní poznámky: ' + err);
-      }
-    });
-  })();
+      const res = await fetch('/api/admin/rag-tech-upload-manuals', {
+        method: 'POST',
+        body: fd
+      });
+
+      const json = await res.json();
+      msg(JSON.stringify(json, null, 2));
+    } catch (err) {
+      msg('Chyba pri uploade: ' + err);
+    }
+  });
+
+  // 📝 ULOŽENIE TECHNICKEJ POZNÁMKY
+  btnSaveNote.addEventListener('click', async () => {
+    const key = getAdminKey();
+    if (!key) {
+      alert("Chýba admin key!");
+      return;
+    }
+
+    const title = (inputNoteTitle.value || '').trim();
+    const text = (inputNoteText.value || '').trim();
+
+    if (!text) {
+      alert('Text poznámky nesmie byť prázdny.');
+      return;
+    }
+
+    msg('Ukladám poznámku...');
+
+    try {
+      const res = await fetch('/api/admin/rag-tech-add-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminKey: key,
+          title,
+          text
+        })
+      });
+
+      const json = await res.json();
+      msg(JSON.stringify(json, null, 2));
+
+      if (json.ok) inputNoteText.value = '';
+    } catch (err) {
+      msg('Chyba pri ukladaní poznámky: ' + err);
+    }
+  });
+
+})();
 </script>
   </body>
 </html>
