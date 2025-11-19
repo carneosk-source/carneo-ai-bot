@@ -294,6 +294,7 @@ if (!effectiveMode) {
     q.includes('manuál');
 
   const isProduct =
+    /\bhodink|\bnaramok|\bnáramok|\bsmart\s?prsten|\bsmart\s?prsteň|\bprsten|\bprsteň|\bring|\bpay\s?ring|\bplatobny\s?prsten|\bplatobný\s?prsteň|\breproduktor|\bspeaker|\bglobus\b|\bnabytok\b/i.test(q) ||
     q.includes('hodink') ||
     q.includes('naramok') ||
     q.includes('náramok') ||
