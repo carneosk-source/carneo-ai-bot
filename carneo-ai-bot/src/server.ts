@@ -470,10 +470,13 @@ function getName(h: any): string {
 }
 
 function getCategory(h: any): string {
+  const m = h.meta || {};
+
   return (
-    h.meta?.category ||
-    h.meta?.categories ||
-    ""
+    (m.category || '') + ' ' +
+    (m.categories || '') + ' ' +
+    (m.url || '') + ' ' +
+    (m.name || '')
   ).toString().toLowerCase();
 }
 
