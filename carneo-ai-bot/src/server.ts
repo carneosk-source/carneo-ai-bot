@@ -495,17 +495,17 @@ Formát:
       isContinuationQuestion(question);
 
 
-    const MEN_CATEGORY_REGEX =
-  /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|pánske hodinky|panske hodinky|smart hodinky pánske|pánske smart hodinky)/i;
+        const MEN_CATEGORY_REGEX =
+      /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|pánske hodinky|panske hodinky|smart hodinky pánske|pánske smart hodinky)/i;
 
-const WOMEN_CATEGORY_REGEX =
-  /(dámsk|damsk|dámske|damske|hodinky dámske|dámske hodinky|smart hodinky dámske|dámske smart hodinky|women|lady|ladies)/i;
+    const WOMEN_CATEGORY_REGEX =
+      /(dámsk|damsk|dámske|damske|hodinky dámske|dámske hodinky|smart hodinky dámske|dámske smart hodinky|women|lady|ladies)/i;
 
-const KIDS_CATEGORY_REGEX =
-  /(detské|detske|detsk|guardkid|tiny|ultra|pre deti|pre-deti|kids|junior|child)/i;
+    const KIDS_CATEGORY_REGEX =
+      /(detské|detske|detsk|guardkid|tiny|ultra|pre deti|pre-deti|kids|junior|child)/i;
 
-const PET_CATEGORY_REGEX =
-  /(dogsafe|lokator|lokátor|gps lokator|pre psa|pre psov|pre domacich milacikov|pet|zviera)/i;
+    const PET_CATEGORY_REGEX =
+      /(dogsafe|lokator|lokátor|gps lokator|pre psa|pre psov|pre domacich milacikov|pet|zviera)/i;
     
     // =========================
     // RAG vyhladavanie
@@ -560,25 +560,22 @@ Doplňujúca otázka zákazníka: ${question}
       return (h.meta?.url || '').toString().toLowerCase();
     }
 
-    // "podpis" produktu – meno + kategória + URL (tu je info o pánske/dámske)
-    function getSignature(h: any): string {
-      return `${getName(h)} ${getCategory(h)} ${getUrl(h)}`.toLowerCase();
-    }
+    // -----------------------------------------------
+    // KLASIFIKÁCIA PRODUKTU (JEDINÝ ZDROJ PRAVDY)
+    // -----------------------------------------------
+    function classifyProduct(h: any) {
+      const name = getName(h).toLowerCase();
+      const url = getUrl(h);
+      const cat = getCategory(h);
+      const blob = `${name} ${url} ${cat}`;
 
-    function isKidProductHit(h: any) {
-      return KIDS_CATEGORY_REGEX.test(getSignature(h));
-    }
+      const isMen = MEN_CATEGORY_REGEX.test(blob);
+      const isWomen = WOMEN_CATEGORY_REGEX.test(blob);
+      const isKids = KIDS_CATEGORY_REGEX.test(blob);
+      const isPet = PET_CATEGORY_REGEX.test(blob);
+      const hasGps = /gps/.test(blob);
 
-    function isPetProductHit(h: any) {
-      return PET_CATEGORY_REGEX.test(getSignature(h));
-    }
-
-    function isWomenProductHit(h: any) {
-      const s = getSignature(h);
-      return (
-        WOMEN_CATEGORY_REGEX.test(s) ||
-        /(dámsk|damsk|dámske|damske|lady|woman|women)/i.test(s)
-      );
+      return { isMen, isWomen, isKids, isPet, hasGps };
     }
 
     function isMenQuery(q: string) {
@@ -595,16 +592,17 @@ Doplňujúca otázka zákazníka: ${question}
 
     let filteredHits = hits;
 
-    // ------- 1) EXTRÉMNE HEURISTIKY ---------
+    // ------- 1) EXTRÉMNE HEURISTIKY (pred lockdownom) ---------
     if (isMenQuery(qLower)) {
-      // pre pánske: vyhoď detské, pet a výrazne dámske (podľa URL aj názvu)
+      // pre pánske: povol pánske + neutrálne, vyhoď detské, pet a vyslovene dámske
       filteredHits = filteredHits.filter((h: any) => {
-        return !isKidProductHit(h) && !isPetProductHit(h) && !isWomenProductHit(h);
+        const p = classifyProduct(h);
+        return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
       });
     } else if (isKidsQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => isKidProductHit(h));
+      filteredHits = filteredHits.filter((h: any) => classifyProduct(h).isKids);
     } else if (isPetQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => isPetProductHit(h));
+      filteredHits = filteredHits.filter((h: any) => classifyProduct(h).isPet);
     }
 
     if (filteredHits.length > 0) {
@@ -621,31 +619,40 @@ Doplňujúca otázka zákazníka: ${question}
       const wantsMen = /pánsk|panske|pansky/.test(q);
       const wantsWomen = /dámsk|damsk|damsky/.test(q);
       const wantsKids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
-      const wantsPet = /pes|psa|psovi|dogsafe/.test(q);
+      const wantsPet = /pes|psa|psovi|dogsafe|zviera/.test(q);
       const gpsRequired = /\bgps\b/.test(q);
 
-      function filterByCat(regex: RegExp) {
-        const filtered = out.filter(h =>
-          regex.test(getSignature(h))
-        );
+      function filterStrict(
+        predicate: (p: ReturnType<typeof classifyProduct>) => boolean
+      ) {
+        const filtered = out.filter(h => predicate(classifyProduct(h)));
+        // ak by nič nenašlo, radšej necháme pôvodný zoznam
         return filtered.length > 0 ? filtered : out;
       }
 
-      // primárna kategória
-      if (wantsMen) out = filterByCat(MEN_CATEGORY_REGEX);
-      if (wantsWomen) out = filterByCat(WOMEN_CATEGORY_REGEX);
-      if (wantsKids) out = filterByCat(KIDS_CATEGORY_REGEX);
-      if (wantsPet) out = filterByCat(PET_CATEGORY_REGEX);
+      if (wantsMen) {
+        // 1) vyber iba pánske modely
+        out = filterStrict(p => p.isMen);
 
-      // GPS → nechaj len GPS modely
+        // 2) poistka – vyhoď jasne dámske/detské/pet
+        out = out.filter(h => {
+          const p = classifyProduct(h);
+          return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
+        });
+      } else if (wantsWomen) {
+        out = filterStrict(p => p.isWomen);
+      } else if (wantsKids) {
+        out = filterStrict(p => p.isKids);
+      } else if (wantsPet) {
+        out = filterStrict(p => p.isPet);
+      }
+
+      // Ak dotaz obsahuje GPS → nechaj len modely s GPS
       if (gpsRequired) {
-        const gpsHits = out.filter(
-          h =>
-            /gps/i.test(h.text || '') ||
-            /gps/i.test(getName(h)) ||
-            /gps/i.test(JSON.stringify(h.meta || {}))
-        );
-        if (gpsHits.length > 0) out = gpsHits;
+        const gpsHits = out.filter(h => classifyProduct(h).hasGps);
+        if (gpsHits.length > 0) {
+          out = gpsHits;
+        }
       }
 
       return out;
