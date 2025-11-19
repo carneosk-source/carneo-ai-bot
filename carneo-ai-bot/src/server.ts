@@ -466,12 +466,34 @@ function isPetQuery(q: string) {
   return /pes|psa|psovi|psom|zviera/i.test(q);
 }
 
-// aplikácia filtra
+// aplikácia filtra podľa typu dotazu
 let filteredHits = hits;
 
+if (isMenQuery(question)) {
+  // pre pánske dotazy vyhoď detské a pet produkty
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return !isKidProduct(name) && !isPetProduct(name);
+  });
 }
 
-// ak sa odfiltruje všetko, nechaj pôvodné
+if (isKidsQuery(question)) {
+  // pre detské dotazy nechaj len detské produkty
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return isKidProduct(name);
+  });
+}
+
+if (isPetQuery(question)) {
+  // pre dotazy na psa/zviera nechaj len pet produkty
+  filteredHits = hits.filter((h: any) => {
+    const name = h.meta?.name || h.meta?.title || '';
+    return isPetProduct(name);
+  });
+}
+
+// ak sa odfiltruje všetko, nechaj pôvodné hits
 if (filteredHits.length > 0) {
   hits.length = 0;
   hits.push(...filteredHits);
