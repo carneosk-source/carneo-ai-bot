@@ -606,6 +606,9 @@ ${citations}
 Pokyny:
 Otazka uz obsahuje pomerne konkretne kriteria (napr. rozpocet, typ, GPS).
 1. Hned odporuc 1 az 3 najvhodnejsie produkty znacky Carneo.
+   Ak ide o konkretny model, ktory ma viac farebnych variantov
+   v poskytnutom kontexte (napr. Sand Grey, Black),
+   zobraz 2–3 tieto farebne varianty ako samostatne body (1., 2., 3.).
 2. Pre KAZDY odporucany produkt pouzi presne TENTO HTML format:
    - cislo v zozname (1., 2., 3.)
    - <b>{NAZOV PRODUKTU}</b><br>
