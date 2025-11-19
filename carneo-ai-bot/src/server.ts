@@ -31,7 +31,7 @@ app.get('/', (_req, res) => {
 
 const TECH_RAG_FILE = path.join(process.cwd(), 'data', 'rag-tech.jsonl');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4.1';
 
 const LOG_FILE = path.join(process.cwd(), 'data', 'chat-logs.jsonl');
 
