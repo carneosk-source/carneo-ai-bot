@@ -438,139 +438,134 @@ Formát:
         break;
     }
 
-    // =========================
-    // RAG vyhladavanie
-    // =========================
-    const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-    let hits = await search(openai, queryForSearch, 6, { domain });
 
-    // -----------------------------------------------
-    // HEURISTIKY PRE NAZVY (rýchle vyhodenie extrémov)
-    // -----------------------------------------------
-    function getName(h: any): string {
-      return (h.meta?.name || h.meta?.title || '').toString();
-    }
+  // ============================================================
+// REGEX pre kategórie – vychádzajú z JSON súboru
+// ============================================================
+const MEN_CATEGORY_REGEX =
+  /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|smart hodinky pánske)/i;
 
-    function getCategory(h: any): string {
-      return (
-        h.meta?.category ||
-        h.meta?.categories ||
-        ''
-      ).toString().toLowerCase();
-    }
+const WOMEN_CATEGORY_REGEX =
+  /(dámsk|damsk|damsky|zen|žena|zena|women|lady|ladies|hodinky dámske)/i;
 
-    function isKidProduct(name: string = '') {
-      return /guardkid|detské|detske|tiny|ultra/i.test(name);
-    }
-    function isPetProduct(name: string = '') {
-      return /dogsafe|lokátor|lokator|zvierat/i.test(name);
-    }
-    function isWomenProduct(name: string = '', cat: string = '') {
-      const s = (name + ' ' + cat).toLowerCase();
-      return /dámsk|damsk|dámske|damske|lady|woman|women/.test(s);
-    }
+const KIDS_CATEGORY_REGEX =
+  /(detsk|guardkid|tiny|ultra|pre deti|dieta|dieťa)/i;
 
-    function isMenQuery(q: string) {
-      return /pánsk|panske|pansky/i.test(q);
-    }
-    function isKidsQuery(q: string) {
-      return /detské|detske|pre deti|dieta|dieťa/i.test(q);
-    }
-    function isPetQuery(q: string) {
-      return /pes|psa|psovi|psom|zviera|dogsafe/i.test(q);
-    }
+const PET_CATEGORY_REGEX =
+  /(dogsafe|lokator|lokátor|zviera|pet|pes|pre psa)/i;
 
-    const qLower = question.toLowerCase();
 
-    // RÝCHLA HEURISTIKA – len extrémne prípady
-    let filteredHits = hits;
+// =========================
+// RAG vyhladavanie
+// =========================
+const queryForSearch = `${searchHint ? searchHint + "\n" : ""}${question}`;
+let hits = await search(openai, queryForSearch, 6, { domain });
 
-    if (isMenQuery(qLower)) {
-      // pre pánske: vyhoď detské, pet a výrazne dámske
-      filteredHits = filteredHits.filter((h: any) => {
-        const name = getName(h);
-        const cat = getCategory(h);
-        return !isKidProduct(name) && !isPetProduct(name) && !isWomenProduct(name, cat);
-      });
-    } else if (isKidsQuery(qLower)) {
-      // pre detské: nechaj len detské / GuardKid / Tiny
-      filteredHits = filteredHits.filter((h: any) => {
-        const name = getName(h);
-        return isKidProduct(name);
-      });
-    } else if (isPetQuery(qLower)) {
-      // pre psa/zviera: nechaj len DogSafe / pet
-      filteredHits = filteredHits.filter((h: any) => {
-        const name = getName(h);
-        return isPetProduct(name);
-      });
-    }
 
-    if (filteredHits.length > 0) {
-      hits = filteredHits;
-    }
+// -----------------------------------------------
+// HEURISTIKY – extrémne rýchle filtrovanie
+// -----------------------------------------------
+function getName(h: any): string {
+  return (h.meta?.name || h.meta?.title || "").toString();
+}
 
-    // --------------------------------------------------------
-    // CATEGORY LOCKDOWN – PRIMÁRNY FILTER PODĽA DOTAZU
-    // --------------------------------------------------------
-    function applyCategoryLockdown(hList: any[], question: string): any[] {
-      const q = question.toLowerCase();
+function getCategory(h: any): string {
+  return (
+    h.meta?.category ||
+    h.meta?.categories ||
+    ""
+  ).toString().toLowerCase();
+}
 
-      const men = /pánsk|panske|pansky/.test(q);
-      const women = /dámsk|damsk|damsky/.test(q);
-      const kids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
-      const pet = /pes|psa|psovi|dogsafe/.test(q);
-      const gpsRequired = /\bgps\b/.test(q);
+function isKidProduct(name: string = "") {
+  return /guardkid|detské|detske|tiny|ultra/i.test(name);
+}
 
-      function filterByCategory(catCheck: (cat: string) => boolean) {
-        const filtered = hList.filter(h => catCheck(getCategory(h)));
-        return filtered.length > 0 ? filtered : hList;
-      }
+function isPetProduct(name: string = "") {
+  return /dogsafe|lokátor|lokator|zvierat|pet/i.test(name);
+}
 
-      let out = hList;
+function isWomenProduct(name: string = "", cat: string = "") {
+  const s = (name + " " + cat).toLowerCase();
+  return /dámsk|damsk|dámske|damske|lady|woman|women/.test(s);
+}
 
-      if (men) {
-        // snaž sa držať kategórie "pánske" – ak nič, nechaj pôvodné
-        out = filterByCategory(cat =>
-          /pánsk|panske/.test(cat) && !/dámsk|damsk/.test(cat)
-        );
-      }
+function isMenQuery(q: string) {
+  return /pánsk|panske|pansky/.test(q);
+}
+function isKidsQuery(q: string) {
+  return /detské|detske|pre deti|dieta|dieťa/.test(q);
+}
+function isPetQuery(q: string) {
+  return /pes|psa|psovi|psom|zviera|dogsafe/.test(q);
+}
 
-      if (women) {
-        out = filterByCategory(cat =>
-          /dámsk|damsk/.test(cat)
-        );
-      }
+const qLower = question.toLowerCase();
 
-      if (kids) {
-        out = filterByCategory(cat =>
-          /detsk|guardkid|tiny/.test(cat)
-        );
-      }
+let filteredHits = hits;
 
-      if (pet) {
-        out = filterByCategory(cat =>
-          /dogsafe|lokator|lokátor|zviera/.test(cat)
-        );
-      }
+// ------- 1) EXTRÉMNE HEURISTIKY ---------
 
-      // Ak dotaz obsahuje GPS → preferuj / filtruj len GPS produkty
-      if (gpsRequired) {
-        const gpsHits = out.filter(h =>
-          /gps/i.test(h.text || '') ||
-          /gps/i.test(getName(h)) ||
-          /gps/i.test(JSON.stringify(h.meta || {}))
-        );
-        if (gpsHits.length > 0) {
-          out = gpsHits;
-        }
-      }
+if (isMenQuery(qLower)) {
+  filteredHits = filteredHits.filter((h: any) => {
+    const name = getName(h);
+    const cat = getCategory(h);
+    return !isKidProduct(name) && !isPetProduct(name) && !isWomenProduct(name, cat);
+  });
+} else if (isKidsQuery(qLower)) {
+  filteredHits = filteredHits.filter((h: any) => isKidProduct(getName(h)));
+} else if (isPetQuery(qLower)) {
+  filteredHits = filteredHits.filter((h: any) => isPetProduct(getName(h)));
+}
 
-      return out;
-    }
+if (filteredHits.length > 0) hits = filteredHits;
 
-    // FINÁLNY FILTER – category lockdown
-    hits = applyCategoryLockdown(hits, question);
+
+// --------------------------------------------------------
+// 2) CATEGORY LOCKDOWN – PRIMÁRNY, tvrdý filter
+// --------------------------------------------------------
+function applyCategoryLockdown(hitsIn: any[], question: string) {
+  const q = question.toLowerCase();
+  let out = hitsIn;
+
+  const wantsMen = /pánsk|panske|pansky/.test(q);
+  const wantsWomen = /dámsk|damsk|damsky/.test(q);
+  const wantsKids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
+  const wantsPet = /pes|psa|psovi|dogsafe/.test(q);
+  const gpsRequired = /\bgps\b/.test(q);
+
+  function filterByCat(regex: RegExp) {
+    const filtered = out.filter(
+      h =>
+        regex.test(getCategory(h)) ||
+        regex.test(h.meta?.name || "")
+    );
+    return filtered.length > 0 ? filtered : out;
+  }
+
+  // primárna kategória
+  if (wantsMen) out = filterByCat(MEN_CATEGORY_REGEX);
+  if (wantsWomen) out = filterByCat(WOMEN_CATEGORY_REGEX);
+  if (wantsKids) out = filterByCat(KIDS_CATEGORY_REGEX);
+  if (wantsPet) out = filterByCat(PET_CATEGORY_REGEX);
+
+  // GPS → nechaj len GPS modely
+  if (gpsRequired) {
+    const gpsHits = out.filter(
+      h =>
+        /gps/i.test(h.text || "") ||
+        /gps/i.test(h.meta?.name || "") ||
+        /gps/i.test(JSON.stringify(h.meta || {}))
+    );
+    if (gpsHits.length > 0) out = gpsHits;
+  }
+
+  return out;
+}
+
+// Použiť lockdown
+hits = applyCategoryLockdown(hits, question);
+
 
     // --------------------------------------------------
     // CITÁCIE (až teraz, keď máme finálne hits)
