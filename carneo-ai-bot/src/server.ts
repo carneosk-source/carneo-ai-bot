@@ -17,7 +17,7 @@ const upload = multer({
   dest: path.join(process.cwd(), 'uploads')
 });
 
-const EMBEDDING_MODEL = 'text-embedding-3-large';
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-3-large';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const app = express();
 app.use(cors());
