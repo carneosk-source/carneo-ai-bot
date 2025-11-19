@@ -342,15 +342,14 @@ namiesto odporucania inej znacky.
 Ak si nie si isty, otvorene to povedz a navrhni eskalaciu na cloveka (Carneo podpora).
 `;
 
-    let systemExtra = '';
+        let systemExtra = '';
     let searchHint = '';
     let domain: 'general' | 'products' | 'tech' = 'general';
 
-    if (effectiveMode === 'product') {
-  domain = 'products';
-}
+    switch (effectiveMode) {
       case 'product':
-  systemExtra = `
+        domain = 'products';
+        systemExtra = `
 Pri otázkach na výber produktu vždy rob toto:
 
 1) prioritne odporúčaj produkty výhradne značky Carneo,
@@ -371,6 +370,10 @@ Pri otázkach na výber produktu vždy rob toto:
 - ak zákazník píše o detských hodinkách, uprednostni modely GuardKid a neodporúčaj DogSAFE lokátor.
 - ak zákazník hľadá GPS pre psa alebo domáceho miláčika, odporúčaj výhradne DogSAFE lokátor, NIE hodinky.
 
+- Ak znalostná databáza obsahuje aspoň 1 produktový výsledok,
+  nikdy netvrd', že produkt Carneo neexistuje.
+  Namiesto toho ho normálne odporuč.
+
 Odpoveď píš prehľadne v bodoch 1., 2., 3.:
 - obrázok (ak existuje)
 - tučný názov produktu
@@ -379,9 +382,8 @@ Odpoveď píš prehľadne v bodoch 1., 2., 3.:
 - aktívny odkaz
 - 2–3 kľúčové parametre
 `;
-  searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
-  domain = 'products';
-  break;
+        searchHint = 'Vyber produktu Carneo, pouzi produktovy index.';
+        break;
 
       case 'order':
         systemExtra = `
@@ -428,7 +430,7 @@ Formát:
 - Používaj krátke odstavce a prehľadné bodovanie.
 - Odpovedaj v jazyku otázky (slovenčina/čeština).`;
         searchHint = 'Téma: technické dotazy a návody k produktom Carneo. Použi TECH databázu (maily, expert poznámky, návody).';
-        domain = 'tech';   // ⚠️ kľúčová zmena
+        domain = 'tech';
         break;
 
       default:
