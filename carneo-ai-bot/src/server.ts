@@ -495,21 +495,18 @@ Formát:
       isContinuationQuestion(question);
 
 
-             // ============================================================
-    // REGEX pre kategórie – vychádzajú z URL z Heureka feedu
-    // ============================================================
     const MEN_CATEGORY_REGEX =
-      /(panske-smart-hodinky|smart-hodinky-panske|pánske-smart-hodinky|pánske hodinky|panske hodinky|\/panske-smart-hodinky\/)/i;
+  /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|pánske hodinky|panske hodinky|smart hodinky pánske|pánske smart hodinky)/i;
 
-    const WOMEN_CATEGORY_REGEX =
-      /(damske-smart-hodinky|smart-hodinky-damske|dámske-smart-hodinky|dámske hodinky|\/damske-smart-hodinky\/)/i;
+const WOMEN_CATEGORY_REGEX =
+  /(dámsk|damsk|dámske|damske|hodinky dámske|dámske hodinky|smart hodinky dámske|dámske smart hodinky|women|lady|ladies)/i;
 
-    const KIDS_CATEGORY_REGEX =
-      /(detske-smart-hodinky|smart-hodinky-detske|guardkid|tiny|ultra|pre-deti|pre deti)/i;
+const KIDS_CATEGORY_REGEX =
+  /(detské|detske|detsk|guardkid|tiny|ultra|pre deti|pre-deti|kids|junior|child)/i;
 
-    const PET_CATEGORY_REGEX =
-      /(dogsafe|lokator-pre-psa|gps-lokator-pre-psov|lokátor pre psov|lokator pre psov|lokator-pre-domacich-milacikov)/i;
-
+const PET_CATEGORY_REGEX =
+  /(dogsafe|lokator|lokátor|gps lokator|pre psa|pre psov|pre domacich milacikov|pet|zviera)/i;
+    
     // =========================
     // RAG vyhladavanie
     // =========================
