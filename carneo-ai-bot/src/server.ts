@@ -495,20 +495,20 @@ Formát:
       isContinuationQuestion(question);
 
 
-         // ============================================================
-    // REGEX pre kategórie – vychádzajú z JSON súboru / feedu
+             // ============================================================
+    // REGEX pre kategórie – vychádzajú z URL z Heureka feedu
     // ============================================================
     const MEN_CATEGORY_REGEX =
-      /(pánsk|panske|pansky|muž|muz|men|man|hodinky pánske|smart hodinky pánske)/i;
+      /(panske-smart-hodinky|smart-hodinky-panske|pánske-smart-hodinky|pánske hodinky|panske hodinky|\/panske-smart-hodinky\/)/i;
 
     const WOMEN_CATEGORY_REGEX =
-      /(dámsk|damsk|damsky|zen|žena|zena|women|lady|ladies|hodinky dámske)/i;
+      /(damske-smart-hodinky|smart-hodinky-damske|dámske-smart-hodinky|dámske hodinky|\/damske-smart-hodinky\/)/i;
 
     const KIDS_CATEGORY_REGEX =
-      /(detsk|guardkid|tiny|ultra|pre deti|dieta|dieťa)/i;
+      /(detske-smart-hodinky|smart-hodinky-detske|guardkid|tiny|ultra|pre-deti|pre deti)/i;
 
     const PET_CATEGORY_REGEX =
-      /(dogsafe|lokator|lokátor|zviera|pet|pes|pre psa)/i;
+      /(dogsafe|lokator-pre-psa|gps-lokator-pre-psov|lokátor pre psov|lokator pre psov|lokator-pre-domacich-milacikov)/i;
 
     // =========================
     // RAG vyhladavanie
@@ -537,6 +537,12 @@ Doplňujúca otázka zákazníka: ${question}
     }
 
     let hits = await search(openai, queryForSearch, 6, { domain });
+    console.log('🔍 RAG DEBUG QUERY:', queryForSearch);
+    hits.forEach((h: any, i: number) => {
+      console.log(
+        ` #${i + 1} | score=${h.score?.toFixed?.(3)} | name=${h.meta?.name} | url=${h.meta?.url}`
+      );
+    });
 
     // -----------------------------------------------
     // HEURISTIKY – extrémne rýchle filtrovanie
@@ -553,27 +559,39 @@ Doplňujúca otázka zákazníka: ${question}
       ).toString().toLowerCase();
     }
 
-    function isKidProduct(name: string = '') {
-      return /guardkid|detské|detske|tiny|ultra/i.test(name);
+    function getUrl(h: any): string {
+      return (h.meta?.url || '').toString().toLowerCase();
     }
 
-    function isPetProduct(name: string = '') {
-      return /dogsafe|lokátor|lokator|zvierat|pet/i.test(name);
+    // "podpis" produktu – meno + kategória + URL (tu je info o pánske/dámske)
+    function getSignature(h: any): string {
+      return `${getName(h)} ${getCategory(h)} ${getUrl(h)}`.toLowerCase();
     }
 
-    function isWomenProduct(name: string = '', cat: string = '') {
-      const s = (name + ' ' + cat).toLowerCase();
-      return /dámsk|damsk|dámske|damske|lady|woman|women/.test(s);
+    function isKidProductHit(h: any) {
+      return KIDS_CATEGORY_REGEX.test(getSignature(h));
+    }
+
+    function isPetProductHit(h: any) {
+      return PET_CATEGORY_REGEX.test(getSignature(h));
+    }
+
+    function isWomenProductHit(h: any) {
+      const s = getSignature(h);
+      return (
+        WOMEN_CATEGORY_REGEX.test(s) ||
+        /(dámsk|damsk|dámske|damske|lady|woman|women)/i.test(s)
+      );
     }
 
     function isMenQuery(q: string) {
-      return /pánsk|panske|pansky/.test(q);
+      return /pánsk|panske|pansky/i.test(q);
     }
     function isKidsQuery(q: string) {
-      return /detské|detske|pre deti|dieta|dieťa/.test(q);
+      return /detské|detske|pre deti|dieta|dieťa/i.test(q);
     }
     function isPetQuery(q: string) {
-      return /pes|psa|psovi|psom|zviera|dogsafe/.test(q);
+      return /pes|psa|psovi|psom|zviera|dogsafe/i.test(q);
     }
 
     const qLower = question.toLowerCase();
@@ -582,18 +600,19 @@ Doplňujúca otázka zákazníka: ${question}
 
     // ------- 1) EXTRÉMNE HEURISTIKY ---------
     if (isMenQuery(qLower)) {
+      // pre pánske: vyhoď detské, pet a výrazne dámske (podľa URL aj názvu)
       filteredHits = filteredHits.filter((h: any) => {
-        const name = getName(h);
-        const cat = getCategory(h);
-        return !isKidProduct(name) && !isPetProduct(name) && !isWomenProduct(name, cat);
+        return !isKidProductHit(h) && !isPetProductHit(h) && !isWomenProductHit(h);
       });
     } else if (isKidsQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => isKidProduct(getName(h)));
+      filteredHits = filteredHits.filter((h: any) => isKidProductHit(h));
     } else if (isPetQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => isPetProduct(getName(h)));
+      filteredHits = filteredHits.filter((h: any) => isPetProductHit(h));
     }
 
-    if (filteredHits.length > 0) hits = filteredHits;
+    if (filteredHits.length > 0) {
+      hits = filteredHits;
+    }
 
     // --------------------------------------------------------
     // 2) CATEGORY LOCKDOWN – PRIMÁRNY, tvrdý filter
@@ -609,10 +628,8 @@ Doplňujúca otázka zákazníka: ${question}
       const gpsRequired = /\bgps\b/.test(q);
 
       function filterByCat(regex: RegExp) {
-        const filtered = out.filter(
-          h =>
-            regex.test(getCategory(h)) ||
-            regex.test(h.meta?.name || '')
+        const filtered = out.filter(h =>
+          regex.test(getSignature(h))
         );
         return filtered.length > 0 ? filtered : out;
       }
@@ -628,7 +645,7 @@ Doplňujúca otázka zákazníka: ${question}
         const gpsHits = out.filter(
           h =>
             /gps/i.test(h.text || '') ||
-            /gps/i.test(h.meta?.name || '') ||
+            /gps/i.test(getName(h)) ||
             /gps/i.test(JSON.stringify(h.meta || {}))
         );
         if (gpsHits.length > 0) out = gpsHits;
