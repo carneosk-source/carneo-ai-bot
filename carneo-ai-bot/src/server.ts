@@ -508,173 +508,139 @@ Formát:
       /(dogsafe|lokator|lokátor|gps lokator|pre psa|pre psov|pre domacich milacikov|pet|zviera)/i;
     
     // =========================
-    // RAG vyhladavanie
-    // =========================
+// RAG vyhladavanie
+// =========================
+const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+let hits = await search(openai, queryForSearch, 8, { domain });
 
-    // ak je to pokračovanie, snažíme sa držať sa posledného produktu
-    let queryForSearch: string;
+// Debug výpis – nechaj, pomôže pri ladení
+console.log('🔍 RAG DEBUG QUERY:', queryForSearch);
+hits.forEach((h: any, i: number) => {
+  console.log(
+    ` #${i + 1} | score=${h.score?.toFixed?.(3)} | name=${h.meta?.name} | url=${h.meta?.url}`
+  );
+});
 
-    let baseProductName: string | null = null;
-    if (isContinuation && lastSessionLog && Array.isArray(lastSessionLog.ragHits)) {
-      const lastProductHit = lastSessionLog.ragHits[0];
-      if (lastProductHit && lastProductHit.name) {
-        baseProductName = String(lastProductHit.name);
-      }
-    }
+// -----------------------------------------------
+// Pomocné funkcie – názov, URL, kategória
+// -----------------------------------------------
+function getName(h: any): string {
+  return (h.meta?.name || h.meta?.title || '').toString();
+}
 
-    if (isContinuation && baseProductName) {
-      // Doplňujúca otázka – sústreď sa na varianty / farby toho istého modelu
-      queryForSearch = `
-Varianty, farby alebo verzie produktu Carneo: ${baseProductName}
-Doplňujúca otázka zákazníka: ${question}
-`;
-    } else {
-      // bežný dopyt
-      queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
-    }
+function getUrl(h: any): string {
+  return (h.meta?.url || '').toString().toLowerCase();
+}
 
-    let hits = await search(openai, queryForSearch, 6, { domain });
-    console.log('🔍 RAG DEBUG QUERY:', queryForSearch);
-    hits.forEach((h: any, i: number) => {
-      console.log(
-        ` #${i + 1} | score=${h.score?.toFixed?.(3)} | name=${h.meta?.name} | url=${h.meta?.url}`
-      );
+function getCategoryMeta(h: any): string {
+  return (
+    h.meta?.category ||
+    h.meta?.categories ||
+    ''
+  ).toString().toLowerCase();
+}
+
+// -----------------------------------------------
+// Klasifikácia produktu podľa URL + názvu + kategórie
+// -----------------------------------------------
+function classifyProduct(h: any) {
+  const name = getName(h).toLowerCase();
+  const url = getUrl(h);
+  const cat = getCategoryMeta(h);
+  const blob = `${name} ${url} ${cat}`;
+
+  const isMen =
+    // primárne podľa URL
+    /panske-smart-hodinky|hodinky-panske/.test(url) ||
+    // alebo podľa textu, ale iba ak to NIE je jasne dámske
+    (/(pánsk|panske|pansky)/.test(blob) &&
+      !/(dámsk|damsk|dámske|damske)/.test(blob));
+
+  const isWomen =
+    /damske-smart-hodinky|hodinky-damske/.test(url) ||
+    /(dámsk|damsk|dámske|damske|lady|women)/.test(blob);
+
+  const isKids =
+    /guardkid/.test(blob) ||
+    /detske-smart-hodinky|detske-gps-hodinky/.test(url) ||
+    /(detské|detske|pre deti)/.test(blob);
+
+  const isPet =
+    /dogsafe/.test(blob) ||
+    /gps-lokator-pre-psa|lokator-pre-domacich-milacikov/.test(url);
+
+  const hasGps = /gps/.test(blob);
+
+  return { isMen, isWomen, isKids, isPet, hasGps };
+}
+
+// --------------------------------------------------------
+// CATEGORY LOCKDOWN – tvrdý filter podľa dotazu
+// --------------------------------------------------------
+function applyCategoryLockdown(hitsIn: any[], question: string) {
+  const q = question.toLowerCase();
+  let out = hitsIn;
+
+  const wantsMen = /pánsk|panske|pansky/.test(q);
+  const wantsWomen = /dámsk|damsk|damsky/.test(q);
+  const wantsKids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
+  const wantsPet = /pes|psa|psovi|dogsafe|zviera/.test(q);
+  const gpsRequired = /\bgps\b/.test(q);
+
+  function filterStrict(
+    predicate: (p: ReturnType<typeof classifyProduct>) => boolean
+  ) {
+    const filtered = out.filter(h => predicate(classifyProduct(h)));
+    // Ak by nič nenašlo, radšej vrátime pôvodný zoznam (nech radšej poradí niečo,
+    // než aby tvrdil, že nič neexistuje)
+    return filtered.length > 0 ? filtered : out;
+  }
+
+  if (wantsMen) {
+    // 1) vyber iba pánske modely
+    out = filterStrict(p => p.isMen);
+
+    // 2) poistka – ak by aj tak ostali vyslovene dámske/detské/pet, vyhoď ich
+    out = out.filter(h => {
+      const p = classifyProduct(h);
+      return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
     });
+  } else if (wantsWomen) {
+    out = filterStrict(p => p.isWomen);
+  } else if (wantsKids) {
+    out = filterStrict(p => p.isKids);
+  } else if (wantsPet) {
+    out = filterStrict(p => p.isPet);
+  }
 
-    // -----------------------------------------------
-    // HEURISTIKY – extrémne rýchle filtrovanie
-    // -----------------------------------------------
-    function getName(h: any): string {
-      return (h.meta?.name || h.meta?.title || '').toString();
+  // Ak dotaz obsahuje GPS → nechaj len modely s GPS
+  if (gpsRequired) {
+    const gpsHits = out.filter(h => classifyProduct(h).hasGps);
+    if (gpsHits.length > 0) {
+      out = gpsHits;
     }
+  }
 
-    function getCategory(h: any): string {
-      return (
-        h.meta?.category ||
-        h.meta?.categories ||
-        ''
-      ).toString().toLowerCase();
-    }
+  return out;
+}
 
-    function getUrl(h: any): string {
-      return (h.meta?.url || '').toString().toLowerCase();
-    }
+// Použiť lockdown na výsledky z RAG
+hits = applyCategoryLockdown(hits, question);
 
-    // -----------------------------------------------
-    // KLASIFIKÁCIA PRODUKTU (JEDINÝ ZDROJ PRAVDY)
-    // -----------------------------------------------
-    function classifyProduct(h: any) {
-      const name = getName(h).toLowerCase();
-      const url = getUrl(h);
-      const cat = getCategory(h);
-      const blob = `${name} ${url} ${cat}`;
-
-      const isMen = MEN_CATEGORY_REGEX.test(blob);
-      const isWomen = WOMEN_CATEGORY_REGEX.test(blob);
-      const isKids = KIDS_CATEGORY_REGEX.test(blob);
-      const isPet = PET_CATEGORY_REGEX.test(blob);
-      const hasGps = /gps/.test(blob);
-
-      return { isMen, isWomen, isKids, isPet, hasGps };
-    }
-
-    function isMenQuery(q: string) {
-      return /pánsk|panske|pansky/i.test(q);
-    }
-    function isKidsQuery(q: string) {
-      return /detské|detske|pre deti|dieta|dieťa/i.test(q);
-    }
-    function isPetQuery(q: string) {
-      return /pes|psa|psovi|psom|zviera|dogsafe/i.test(q);
-    }
-
-    const qLower = question.toLowerCase();
-
-    let filteredHits = hits;
-
-    // ------- 1) EXTRÉMNE HEURISTIKY (pred lockdownom) ---------
-    if (isMenQuery(qLower)) {
-      // pre pánske: povol pánske + neutrálne, vyhoď detské, pet a vyslovene dámske
-      filteredHits = filteredHits.filter((h: any) => {
-        const p = classifyProduct(h);
-        return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
-      });
-    } else if (isKidsQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => classifyProduct(h).isKids);
-    } else if (isPetQuery(qLower)) {
-      filteredHits = filteredHits.filter((h: any) => classifyProduct(h).isPet);
-    }
-
-    if (filteredHits.length > 0) {
-      hits = filteredHits;
-    }
-
-    // --------------------------------------------------------
-    // 2) CATEGORY LOCKDOWN – PRIMÁRNY, tvrdý filter
-    // --------------------------------------------------------
-    function applyCategoryLockdown(hitsIn: any[], question: string) {
-      const q = question.toLowerCase();
-      let out = hitsIn;
-
-      const wantsMen = /pánsk|panske|pansky/.test(q);
-      const wantsWomen = /dámsk|damsk|damsky/.test(q);
-      const wantsKids = /detsk|guardkid|tiny|pre deti|dieťa|dieta/.test(q);
-      const wantsPet = /pes|psa|psovi|dogsafe|zviera/.test(q);
-      const gpsRequired = /\bgps\b/.test(q);
-
-      function filterStrict(
-        predicate: (p: ReturnType<typeof classifyProduct>) => boolean
-      ) {
-        const filtered = out.filter(h => predicate(classifyProduct(h)));
-        // ak by nič nenašlo, radšej necháme pôvodný zoznam
-        return filtered.length > 0 ? filtered : out;
-      }
-
-      if (wantsMen) {
-        // 1) vyber iba pánske modely
-        out = filterStrict(p => p.isMen);
-
-        // 2) poistka – vyhoď jasne dámske/detské/pet
-        out = out.filter(h => {
-          const p = classifyProduct(h);
-          return p.isMen || (!p.isWomen && !p.isKids && !p.isPet);
-        });
-      } else if (wantsWomen) {
-        out = filterStrict(p => p.isWomen);
-      } else if (wantsKids) {
-        out = filterStrict(p => p.isKids);
-      } else if (wantsPet) {
-        out = filterStrict(p => p.isPet);
-      }
-
-      // Ak dotaz obsahuje GPS → nechaj len modely s GPS
-      if (gpsRequired) {
-        const gpsHits = out.filter(h => classifyProduct(h).hasGps);
-        if (gpsHits.length > 0) {
-          out = gpsHits;
-        }
-      }
-
-      return out;
-    }
-
-    // Použiť lockdown
-    hits = applyCategoryLockdown(hits, question);
-
-    // --------------------------------------------------
-    // CITÁCIE (až teraz, keď máme finálne hits)
-    // --------------------------------------------------
-    const citations = hits
-      .map((h: any, i: number) => {
-        const meta: any = h.meta || {};
-        const urlPart = meta.url ? ` URL: ${meta.url}` : '';
-        const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
-        return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
-          0,
-          180
-        )}...${urlPart}${imagePart}`;
-      })
-      .join('\n');
+// --------------------------------------------------
+// CITÁCIE (až teraz, keď máme finálne hits)
+// --------------------------------------------------
+const citations = hits
+  .map((h: any, i: number) => {
+    const meta: any = h.meta || {};
+    const urlPart = meta.url ? ` URL: ${meta.url}` : '';
+    const imagePart = meta.image ? ` IMAGE: ${meta.image}` : '';
+    return `[[${i + 1}]] ${meta.name || meta.file || 'doc'}: ${h.text.slice(
+      0,
+      180
+    )}...${urlPart}${imagePart}`;
+  })
+  .join('\n');
     
 // ...
     // Heuristika: je otázka dostatočne špecifická?
