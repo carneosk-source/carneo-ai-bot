@@ -507,10 +507,32 @@ Formát:
     const PET_CATEGORY_REGEX =
       /(dogsafe|lokator|lokátor|gps lokator|pre psa|pre psov|pre domacich milacikov|pet|zviera)/i;
     
-    // =========================
+   // =========================
 // RAG vyhladavanie
 // =========================
-const queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+
+// ak je to pokračovanie, snažíme sa držať sa posledného produktu
+let queryForSearch: string;
+
+let baseProductName: string | null = null;
+if (isContinuation && lastSessionLog && Array.isArray(lastSessionLog.ragHits)) {
+  const lastProductHit = lastSessionLog.ragHits[0];
+  if (lastProductHit && lastProductHit.name) {
+    baseProductName = String(lastProductHit.name);
+  }
+}
+
+if (isContinuation && baseProductName) {
+  // Doplňujúca otázka – sústreď sa na varianty / farby toho istého modelu
+  queryForSearch = `
+Varianty, farby alebo verzie produktu Carneo: ${baseProductName}
+Doplňujúca otázka zákazníka: ${question}
+`;
+} else {
+  // bežný dopyt
+  queryForSearch = `${searchHint ? searchHint + '\n' : ''}${question}`;
+}
+
 let hits = await search(openai, queryForSearch, 8, { domain });
 
 // Debug výpis – nechaj, pomôže pri ladení
